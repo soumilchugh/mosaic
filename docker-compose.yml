@@ -1,0 +1,56 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+      - neo4j
+      - minio
+
+  worker:
+    build:
+      context: .
+      dockerfile: services/worker/Dockerfile
+    command: python -m worker.main
+    depends_on:
+      - postgres
+      - redis
+      - neo4j
+      - minio
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: agent_harness
+      POSTGRES_USER: agent_harness
+      POSTGRES_PASSWORD: agent_harness
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  neo4j:
+    image: neo4j:5
+    environment:
+      NEO4J_AUTH: neo4j/agent_harness
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: agent_harness
+      MINIO_ROOT_PASSWORD: agent_harness
+    ports:
+      - "9000:9000"
+      - "9001:9001"

@@ -1,0 +1,9 @@
+{
+  "name": "@agent-harness/web",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "lint": "echo \"web lint placeholder\"",
+    "test": "echo \"web test placeholder\""
+  }
+}
