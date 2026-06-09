@@ -6,7 +6,7 @@
 apps/web                  Research workspace UI
 services/api              Durable REST commands and WebSocket stream
 services/worker           Agent execution and research jobs
-packages/harness_core     Agent loop, tools, permissions, events
+packages/harness_core     DeepAgents adapter, event mapping, tool bridges
 packages/research_core    Deep research roles, graph schema, prompts, workflows
 ```
 
@@ -35,7 +35,9 @@ WS   /research-runs/{run_id}/stream
 
 ## Event Stream
 
-The worker emits typed events such as:
+The worker runs DeepAgents through `packages/harness_core`. DeepAgents-native stream
+events are mapped into product events that the API can persist and forward over
+WebSocket. Product events include:
 
 - `run.started`
 - `planner.topic_proposed`
@@ -52,3 +54,15 @@ The worker emits typed events such as:
 - `artifact.generated`
 - `run.completed`
 - `run.failed`
+
+## Harness Boundary
+
+DeepAgents is the V1 agent engine. The product should not call DeepAgents directly from
+every service. Instead, `packages/harness_core` exposes a small adapter boundary:
+
+```text
+ResearchTask -> DeepAgents run -> ResearchEvent stream
+```
+
+This keeps the API, worker, and frontend coupled to our product contracts rather than to
+DeepAgents internals.

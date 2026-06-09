@@ -2,9 +2,10 @@
 
 ## Goal
 
-Build a deep research system on a focused agent harness. The system should ingest local
-documents and web sources, maintain a live evidence graph, and stream a citation-backed
-Markdown report while research continues.
+Build a deep research system on LangChain DeepAgents. DeepAgents provides the agent
+harness capabilities: planning, tool use, context management, subagents, streaming,
+permissions, and human-in-the-loop control. Our product layer supplies research-specific
+run contracts, tools, source/report graphs, citations, and the frontend event stream.
 
 ## V1 Workflow
 
@@ -19,9 +20,10 @@ Markdown report while research continues.
 
 ## Delivery Principles
 
-- Keep the harness runnable before every tool is complete.
-- Use typed event contracts between API, worker, frontend, and agent loop.
-- Prefer thin tools first, then deepen each tool behind a stable interface.
+- Use DeepAgents as the agent engine instead of rebuilding an agent runtime.
+- Keep our DeepAgents adapter thin, typed, and replaceable.
+- Use typed event contracts between API, worker, frontend, and DeepAgents streams.
+- Prefer thin research tools first, then deepen each tool behind a stable interface.
 - Tie every substantial feature to a GitHub issue and PR.
 - Require CI on every PR from the beginning.
 
@@ -29,11 +31,11 @@ Markdown report while research continues.
 
 ### M1: Harness Spine
 
-- Define task/run state.
-- Define event model.
-- Define tool protocol and registry.
-- Implement a minimal async agent loop.
-- Add deterministic unit tests with mock tools.
+- Adopt DeepAgents as the V1 harness.
+- Define product-level research run, task, and event contracts.
+- Define an adapter boundary around DeepAgents.
+- Map DeepAgents stream events into product events.
+- Prove one minimal SDK-backed run with deterministic tests.
 
 ### M2: Runtime Shell
 
@@ -46,7 +48,7 @@ Markdown report while research continues.
 
 - Filesystem/document ingestion tool.
 - Web search/scrape tool abstraction.
-- Permission model for tool calls.
+- DeepAgents-compatible permission policy for tool calls.
 - Structured tool errors and trace events.
 
 ### M4: Research Workflow
@@ -65,6 +67,7 @@ Markdown report while research continues.
 
 ## Initial Open Questions
 
+- Which DeepAgents model provider should be wired first for local development?
 - Which search provider should be wired first?
 - Should Neo4j be mandatory in local dev or support degraded mode?
 - Should model/provider keys be user-supplied in V1?
