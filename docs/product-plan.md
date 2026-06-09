@@ -32,6 +32,7 @@ run contracts, tools, source/report graphs, citations, and the frontend event st
 ### M1: Harness Spine
 
 - Adopt DeepAgents as the V1 harness.
+- Study and map DeepAgents SDK capabilities to the product architecture.
 - Define product-level research run, task, and event contracts.
 - Define an adapter boundary around DeepAgents.
 - Map DeepAgents stream events into product events.
@@ -46,13 +47,16 @@ run contracts, tools, source/report graphs, citations, and the frontend event st
 
 ### M3: Tool Foundation
 
+- DeepAgents composite backend and virtual filesystem layout.
 - Filesystem/document ingestion tool.
 - Web search/scrape tool abstraction.
 - DeepAgents-compatible permission policy for tool calls.
+- Upload and artifact transfer pipeline.
 - Structured tool errors and trace events.
 
 ### M4: Research Workflow
 
+- DeepAgents subagent roster and role-specific skills.
 - Planner topic proposal.
 - Topic approval intervention.
 - Research frontier strategy.
