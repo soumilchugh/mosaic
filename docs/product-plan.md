@@ -13,10 +13,12 @@ run contracts, tools, source/report graphs, citations, and the frontend event st
 2. Planner performs fast reconnaissance and proposes topics plus an outline.
 3. User approves or edits topics before deeper research begins.
 4. Researcher agents explore topics using breadth-first, depth-first, or hybrid strategy.
-5. Sources are processed into a source graph in real time.
-6. Writer streams Markdown sections once evidence thresholds are met.
-7. Editor reviews draft sections against the source graph and suggests improvements.
-8. User receives a final Markdown report with citations and generated artifacts.
+5. Search as Code can fan out web, document, connector, and codebase retrieval programs
+   inside a bounded sandbox when the question requires broad evidence gathering.
+6. Sources are processed into a source graph in real time.
+7. Writer streams Markdown sections once evidence thresholds are met.
+8. Editor reviews draft sections against the source graph and suggests improvements.
+9. User receives a final Markdown report with citations and generated artifacts.
 
 ## Delivery Principles
 
@@ -50,6 +52,8 @@ run contracts, tools, source/report graphs, citations, and the frontend event st
 - DeepAgents composite backend and virtual filesystem layout.
 - Filesystem/document ingestion tool.
 - Web search/scrape tool abstraction.
+- Search as Code retrieval runner.
+- Codebase ingestion/search/citation tools.
 - DeepAgents-compatible permission policy for tool calls.
 - Upload and artifact transfer pipeline.
 - Structured tool errors and trace events.
@@ -57,6 +61,7 @@ run contracts, tools, source/report graphs, citations, and the frontend event st
 ### M4: Research Workflow
 
 - DeepAgents subagent roster and role-specific skills.
+- Search program runner and code researcher subagents.
 - Planner topic proposal.
 - Topic approval intervention.
 - Research frontier strategy.

@@ -101,6 +101,84 @@ Uploaded assets should flow through the product, not directly through an LLM too
 For sandbox-backed runs, use DeepAgents sandbox backend transfer APIs to seed files before
 execution and retrieve generated artifacts after execution.
 
+## Search As Code
+
+Inspired by Perplexity's "Search as Code" architecture, deep research should treat search
+as a programmable workflow rather than a single query tool call. The agent should be able
+to write and run retrieval plans in the sandbox, observe partial results, and change
+course when evidence quality is weak.
+
+The product should support a `search-program-runner` tool/subagent that can:
+
+- decompose a research question into many targeted retrieval tasks
+- run web, document, connector, and codebase searches in parallel
+- retry or expand searches when source quality is low
+- dedupe, join, rank, and filter results in code before sending them back to the model
+- track every source, score, query, and transformation for citation/debugging
+- merge live web and authorized internal sources in the same run
+
+This should run inside the sandbox, near the agent, with strict limits:
+
+- bounded parallelism
+- per-run compute/time budgets
+- allowlisted connectors
+- no unapproved external side effects
+- all source provenance preserved
+
+The research graph should store both raw retrieved sources and derived search-program
+metadata:
+
+```text
+ResearchQuery
+  -> SearchProgram
+  -> RetrievalStep
+  -> RetrievedSource
+  -> RankedEvidence
+```
+
+This gives the editor and citation layer enough information to explain why a source was
+used, what query found it, and whether conflicting sources were considered.
+
+## Codebase Research
+
+Code repositories should be a first-class research corpus alongside local documents and
+web sources. This is separate from "Search as Code": Search as Code is how retrieval is
+planned and executed; codebase research is one kind of source it can search.
+
+Use a dedicated `code-researcher` subagent for questions such as:
+
+- "Where is authentication enforced?"
+- "Which services depend on this model?"
+- "What changed between these releases?"
+- "Which vulnerabilities affect our stack?"
+- "How does this API work end to end?"
+
+The code search stack should combine:
+
+- lexical search using `ripgrep`-style exact matching
+- filename/path search
+- symbol extraction for functions/classes/types/routes
+- dependency graph traversal
+- optional semantic code embeddings
+- commit/PR/release metadata where connected
+- sandboxed test or static-analysis execution when approved
+
+Codebase ingestion should preserve provenance:
+
+```text
+Repository
+  -> Commit
+  -> File
+  -> Symbol
+  -> CodeChunk
+  -> Dependency
+  -> Finding
+```
+
+Code search results should cite file paths, line numbers, commit SHAs, and repository
+URLs when available. Generated answers should distinguish observed code facts from model
+inferences.
+
 ## Permissions And HITL
 
 Use DeepAgents filesystem permissions for path-level access:
@@ -150,6 +228,8 @@ Use DeepAgents subagents for isolated roles:
 - `planner`: fast reconnaissance, topic proposals, outline
 - `local-document-researcher`: uploaded document analysis
 - `web-researcher`: web search, source ranking, scraping
+- `search-program-runner`: sandboxed Search as Code retrieval orchestration
+- `code-researcher`: repository search, symbol/dependency analysis, code citations
 - `evidence-extractor`: entities, claims, facts, contradictions
 - `writer`: Markdown section drafting
 - `editor`: graph-aware review and suggestions
@@ -175,6 +255,8 @@ Initial skill directories:
 ```text
 /skills/source-evaluation/
 /skills/citation-writing/
+/skills/search-as-code/
+/skills/code-research/
 /skills/market-research/
 /skills/technical-research/
 /skills/report-structure/
@@ -216,6 +298,8 @@ DeepAgents messages       -> run.message / report.delta / editor.suggestion
 DeepAgents tool_calls     -> tool.called / tool.completed / source.found
 DeepAgents subagents      -> subagent.started / subagent.completed / subagent.failed
 DeepAgents interrupts     -> user_intervention.requested
+Search program steps      -> research.query_started / source.found / source.ranked
+Code search results       -> code.symbol_found / code.reference_added / source.found
 DeepAgents output         -> run.completed / report.completed
 DeepAgents errors         -> run.failed / subagent.failed / tool.failed
 ```
@@ -232,9 +316,11 @@ in trace metadata for debugging.
 5. Add backend factory with local `CompositeBackend`.
 6. Add permission policy and HITL resume flow.
 7. Add upload/artifact seeding and retrieval.
-8. Add subagent roster and event mapping.
-9. Add skills directory and read-only skills route.
-10. Add durable checkpointer/store integration.
+8. Add Search as Code runner with bounded sandbox execution.
+9. Add codebase research ingestion/search/citation tools.
+10. Add subagent roster and event mapping.
+11. Add skills directory and read-only skills route.
+12. Add durable checkpointer/store integration.
 
 ## Key Open Questions
 
@@ -247,6 +333,9 @@ in trace metadata for debugging.
 - How strict should memory-write approval be in V1?
 - Should topic approval be modeled as a DeepAgents interrupt or as a product-level pause
   before the DeepAgents deep-research phase starts?
+- Which internal connectors should Search as Code support first?
+- Should codebase search be local-only first, GitHub-backed first, or both?
+- What budget limits should apply to generated search programs?
 
 ## References
 
@@ -259,3 +348,4 @@ in trace metadata for debugging.
 - Skills: https://docs.langchain.com/oss/python/deepagents/skills
 - Sandboxes: https://docs.langchain.com/oss/python/deepagents/sandboxes
 - Event streaming: https://docs.langchain.com/oss/python/deepagents/event-streaming
+- Perplexity blog paste: "Deep Research, now in Computer" published June 11, 2026
