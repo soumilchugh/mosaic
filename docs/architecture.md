@@ -22,6 +22,10 @@ neo4j      Source and report graphs
 minio      Local object storage
 ```
 
+Neo4j should be optional at first. V1 can use Postgres as the graph repository for nodes,
+edges, chunks, ingestion state, and file/source/code references, then project to Neo4j
+later if multi-hop graph queries become central.
+
 ## API Shape
 
 ```text
@@ -46,6 +50,8 @@ WebSocket. Product events include:
 - `research.query_started`
 - `source.found`
 - `source.processed`
+- `source.deepened`
+- `code.reference_added`
 - `claim.extracted`
 - `section.started`
 - `report.delta`

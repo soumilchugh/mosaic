@@ -15,10 +15,14 @@ run contracts, tools, source/report graphs, citations, and the frontend event st
 4. Researcher agents explore topics using breadth-first, depth-first, or hybrid strategy.
 5. Search as Code can fan out web, document, connector, and codebase retrieval programs
    inside a bounded sandbox when the question requires broad evidence gathering.
-6. Sources are processed into a source graph in real time.
-7. Writer streams Markdown sections once evidence thresholds are met.
-8. Editor reviews draft sections against the source graph and suggests improvements.
-9. User receives a final Markdown report with citations and generated artifacts.
+6. New sources create shallow knowledge cards and graph nodes first; deeper ingestion
+   happens only when a question requires more detail.
+7. Graph-guided retrieval returns known source files, chunks, page ranges, code symbols,
+   and relationships; the agent decides relevance and whether to deepen the original
+   source.
+8. Writer streams Markdown sections once evidence thresholds are met.
+9. Editor reviews draft sections against the source graph and suggests improvements.
+10. User receives a final Markdown report with citations and generated artifacts.
 
 ## Delivery Principles
 
@@ -54,6 +58,8 @@ run contracts, tools, source/report graphs, citations, and the frontend event st
 - Web search/scrape tool abstraction.
 - Search as Code retrieval runner.
 - Codebase ingestion/search/citation tools.
+- File-native graph repository and progressive ingestion states.
+- Graph-guided retrieval tools that return source/code result sets.
 - DeepAgents-compatible permission policy for tool calls.
 - Upload and artifact transfer pipeline.
 - Structured tool errors and trace events.
@@ -69,7 +75,8 @@ run contracts, tools, source/report graphs, citations, and the frontend event st
 
 ### M5: Graph, Citations, Editing
 
-- Source graph model.
+- Source/code graph model.
+- File-native graph projection.
 - Report graph model.
 - Citation model.
 - Editor criteria and suggestion events.

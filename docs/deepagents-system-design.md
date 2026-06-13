@@ -101,6 +101,123 @@ Uploaded assets should flow through the product, not directly through an LLM too
 For sandbox-backed runs, use DeepAgents sandbox backend transfer APIs to seed files before
 execution and retrieve generated artifacts after execution.
 
+## Live Knowledge Workspace And Graph
+
+The knowledge system should combine agent-readable files with a graph/index projection.
+The graph is not expected to decide whether evidence is relevant. It should return
+structured results that describe what the system currently knows. The agent evaluates
+those results and decides whether to answer, search again, or deepen original sources.
+
+```text
+Raw source or repository
+  -> shallow source/code card
+  -> central research map
+  -> graph nodes and edges
+  -> graph-guided retrieval results
+  -> agent evaluation
+  -> targeted deepening when needed
+  -> updated files and graph
+```
+
+The graph response should be mechanical and provenance-rich:
+
+```json
+{
+  "nodes": [
+    {
+      "id": "source_017",
+      "type": "source",
+      "summary_path": "/workspace/sources/source_017.md",
+      "raw_path": "/artifacts/source_017.pdf",
+      "known_ranges": ["59-80"],
+      "known_chunks": ["chunk_017_12", "chunk_017_13"],
+      "known_claims": ["claim_201"],
+      "edges": ["COVERS_TOPIC", "MENTIONS_ENTITY"],
+      "ingestion_level": "shallow_card"
+    }
+  ],
+  "paths": [],
+  "metadata": {
+    "query_id": "query_042",
+    "snapshot": "2026-06-13T14:30:00Z"
+  }
+}
+```
+
+The graph should avoid language such as "likely relevant" or "probably contains." It
+returns known nodes, edges, file paths, chunks, page ranges, and source references. The
+agent decides relevance and sufficiency.
+
+### Progressive Ingestion
+
+Each source should start cheap and become richer only when work requires it.
+
+```text
+0 discovered
+1 shallow_card          high-level summary, topics, entities, outline, raw pointer
+2 section_indexed       headings/page ranges/section summaries
+3 topic_deepened        selected sections read for a specific topic
+4 claim_extracted       claims, citations, contradictions, confidence
+5 exhaustively_indexed  rare, source fully processed
+```
+
+New PDFs, web pages, files, repositories, and connector records should first produce
+shallow cards. A 100-page PDF should not be exhaustively analyzed by default. The system
+should preserve enough structure for future retrieval:
+
+- high-level summary
+- known topics and entities
+- table of contents or inferred outline
+- page/section hints where cheap
+- raw file pointer
+- ingestion level and covered ranges
+- links to topic files and graph nodes
+
+When a future question needs missing detail, the agent can call a deepening tool:
+
+```python
+await ctx.ingestion.deepen_source(
+    source_id="source_017",
+    topic="software supply chain",
+    ranges=["59-80"],
+    mode="claims_and_citations",
+    budget={"max_pages": 20, "max_minutes": 4},
+)
+```
+
+The deepening tool updates the source card, topic file, chunks, claims, graph edges, and
+search indexes. Future runs benefit from the learned structure.
+
+### File-Native Graph Projection
+
+Files remain the agent-facing workspace:
+
+```text
+/workspace/research_map.md
+/workspace/topics/<topic>.md
+/workspace/sources/<source>.md
+/workspace/code/<repo>/<commit>/repo_card.md
+/workspace/report/<section>.md
+```
+
+The graph indexes and connects these files:
+
+```text
+Topic -> COVERED_BY -> TopicFile
+Source -> DESCRIBED_BY -> SourceCard
+Source -> HAS_CHUNK -> Chunk
+Chunk -> SUPPORTS -> Claim
+Claim -> ABOUT -> Topic
+Claim -> CONTRADICTS -> Claim
+Repository -> HAS_FILE -> CodeFile
+CodeFile -> DEFINES -> Symbol
+Symbol -> DEPENDS_ON -> Symbol
+ReportSection -> CITES -> Source/Chunk/CodeReference
+```
+
+This gives the agent a reliable starting point without forcing every raw source to be
+fully extracted up front.
+
 ## Search As Code
 
 Inspired by Perplexity's "Search as Code" architecture, deep research should treat search
@@ -138,6 +255,10 @@ ResearchQuery
 
 This gives the editor and citation layer enough information to explain why a source was
 used, what query found it, and whether conflicting sources were considered.
+
+Search programs should query the graph first. If the graph returns weak or empty current
+knowledge, the program can search source cards, raw files, web/connectors, or code
+repositories, then deepen the graph with any newly discovered information.
 
 ## Codebase Research
 
@@ -178,6 +299,31 @@ Repository
 Code search results should cite file paths, line numbers, commit SHAs, and repository
 URLs when available. Generated answers should distinguish observed code facts from model
 inferences.
+
+Codebase research follows the same progressive ingestion loop:
+
+```text
+Repository connected
+  -> repo_card.md with purpose, languages, packages, entry points
+  -> shallow graph nodes for files, symbols, routes, dependencies
+  -> graph search returns file/symbol references
+  -> agent inspects exact files/lines when needed
+  -> deeper symbol/dependency/test findings are written back
+```
+
+The first pass should avoid full semantic analysis of every file. It should index the
+repository map, file tree, dependency manifests, route definitions, public symbols, and
+README/docs. Deeper passes are triggered by questions:
+
+- trace an API end to end
+- explain a module boundary
+- identify vulnerable dependencies
+- compare two commits
+- find call sites or data flow for a symbol
+
+The code graph should return result sets such as files, symbols, references, commit SHAs,
+and line ranges. The `code-researcher` decides which files to read and whether to update
+the graph with newly discovered relationships.
 
 ## Permissions And HITL
 
@@ -220,6 +366,18 @@ Persist:
 
 Short-term context and large tool outputs should stay in the DeepAgents backend. Product
 events should store the durable user-visible projection, not every internal token.
+
+V1 can implement the graph repository in Postgres tables first:
+
+```text
+graph_nodes(id, type, title, file_path, artifact_path, metadata)
+graph_edges(id, from_node_id, relation, to_node_id, confidence, metadata)
+graph_chunks(id, node_id, source_range, text_ref, metadata)
+ingestion_runs(id, target_node_id, mode, coverage, status, metadata)
+```
+
+Neo4j can be added later as a projection if multi-hop relationship queries outgrow the
+Postgres graph repository. The adapter should keep the agent-facing graph tools stable.
 
 ## Subagent Design
 
@@ -316,11 +474,13 @@ in trace metadata for debugging.
 5. Add backend factory with local `CompositeBackend`.
 6. Add permission policy and HITL resume flow.
 7. Add upload/artifact seeding and retrieval.
-8. Add Search as Code runner with bounded sandbox execution.
-9. Add codebase research ingestion/search/citation tools.
-10. Add subagent roster and event mapping.
-11. Add skills directory and read-only skills route.
-12. Add durable checkpointer/store integration.
+8. Add file-native graph repository and progressive ingestion states.
+9. Add graph-guided retrieval tools that return source/code result sets.
+10. Add Search as Code runner with bounded sandbox execution.
+11. Add codebase research ingestion/search/citation tools.
+12. Add subagent roster and event mapping.
+13. Add skills directory and read-only skills route.
+14. Add durable checkpointer/store integration.
 
 ## Key Open Questions
 
@@ -336,6 +496,10 @@ in trace metadata for debugging.
 - Which internal connectors should Search as Code support first?
 - Should codebase search be local-only first, GitHub-backed first, or both?
 - What budget limits should apply to generated search programs?
+- Should the initial graph repository be Postgres-only, or should Neo4j be available as
+  an optional projection from day one?
+- What minimum shallow card fields are required before a source is useful for graph
+  retrieval?
 
 ## References
 
