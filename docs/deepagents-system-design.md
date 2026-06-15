@@ -40,6 +40,85 @@ API / Worker
 The API and frontend should not depend on DeepAgents-native stream objects directly.
 Everything becomes a product contract first.
 
+## Product Persistence And Sessions
+
+The product needs durable user, workspace, conversation, asset, event, and graph state
+outside of DeepAgents. DeepAgents should be resumable through product-owned IDs, but it
+should not be the only source of truth for user-visible history.
+
+Postgres is the V1 system of record:
+
+```text
+users
+workspaces
+workspace_memberships
+conversations
+messages
+research_runs
+research_events
+intervention_requests
+deepagents_threads
+assets
+knowledge_files
+graph_nodes
+graph_edges
+graph_chunks
+ingestion_runs
+```
+
+Object storage owns file bytes:
+
+```text
+uploaded PDFs/docs/images
+fetched web source snapshots
+generated reports
+charts/images/slides
+code archives or repository snapshots
+```
+
+`assets` records in Postgres point to MinIO/S3 object URIs, content hashes, MIME types,
+owners, workspace IDs, and source provenance.
+
+DeepAgents thread and checkpoint state should be keyed by product IDs:
+
+```text
+conversation_id -> default DeepAgents thread_id
+research_run_id -> run-specific DeepAgents thread_id
+intervention_request_id -> interrupt/resume correlation
+```
+
+This lets the product resume conversations, continue interrupted research runs, and
+rebuild the visible timeline even if a worker restarts.
+
+## Context Pack Assembly
+
+Before each DeepAgents invocation, the worker should assemble a bounded context pack from
+persisted product state:
+
+1. conversation summary
+2. recent messages
+3. active research run state
+4. pending interventions
+5. relevant workspace/project metadata
+6. graph-guided retrieval result sets
+7. selected source/code cards and topic files
+8. asset metadata and accessible workspace paths
+9. DeepAgents thread/checkpoint ID
+
+The context pack is the bridge between session persistence and agent execution. It keeps
+inputs bounded while still grounding the agent in prior work.
+
+Context assembly should be deterministic enough to audit:
+
+- record graph queries and result IDs used for each run step
+- record selected files/cards included in context
+- preserve the event that triggered assembly
+- avoid loading raw assets unless the graph/source card indicates the agent should inspect
+  them
+
+DeepAgents owns internal execution state; the product owns the recoverable context recipe
+and user-visible timeline.
+
 ## Filesystem And Backend Strategy
 
 Use a composite virtual filesystem:
@@ -357,8 +436,10 @@ threads.
 
 Persist:
 
+- users, workspaces, conversations, messages, and assets in Postgres
 - `ResearchRun` state in Postgres
 - event stream in Postgres
+- intervention requests and resume decisions in Postgres
 - uploaded/generated artifacts in object storage
 - DeepAgents checkpoints through a durable LangGraph checkpointer
 - long-term memory through `StoreBackend` or equivalent durable backend
@@ -469,18 +550,20 @@ in trace metadata for debugging.
 
 1. Study and lock the DeepAgents integration contract.
 2. Add DeepAgents dependency and adapter interface.
-3. Define `ResearchTask`, `ResearchRun`, `ResearchEvent`, and `InterventionRequest`.
-4. Build a minimal DeepAgents-backed run with one simple tool.
-5. Add backend factory with local `CompositeBackend`.
-6. Add permission policy and HITL resume flow.
-7. Add upload/artifact seeding and retrieval.
-8. Add file-native graph repository and progressive ingestion states.
-9. Add graph-guided retrieval tools that return source/code result sets.
-10. Add Search as Code runner with bounded sandbox execution.
-11. Add codebase research ingestion/search/citation tools.
-12. Add subagent roster and event mapping.
-13. Add skills directory and read-only skills route.
-14. Add durable checkpointer/store integration.
+3. Define user, workspace, conversation, asset, run, event, and intervention contracts.
+4. Add durable DeepAgents thread/checkpoint mapping.
+5. Add context pack assembly from conversation, graph, assets, and knowledge files.
+6. Build a minimal DeepAgents-backed run with one simple tool.
+7. Add backend factory with local `CompositeBackend`.
+8. Add permission policy and HITL resume flow.
+9. Add upload/artifact seeding and retrieval.
+10. Add file-native graph repository and progressive ingestion states.
+11. Add graph-guided retrieval tools that return source/code result sets.
+12. Add Search as Code runner with bounded sandbox execution.
+13. Add codebase research ingestion/search/citation tools.
+14. Add subagent roster and event mapping.
+15. Add skills directory and read-only skills route.
+16. Add durable checkpointer/store integration.
 
 ## Key Open Questions
 
@@ -500,6 +583,9 @@ in trace metadata for debugging.
   an optional projection from day one?
 - What minimum shallow card fields are required before a source is useful for graph
   retrieval?
+- Should conversation-level and research-run-level DeepAgents threads be separate from
+  the start, or should every research run own a child thread under a conversation?
+- How aggressively should old messages be summarized versus kept in direct context?
 
 ## References
 

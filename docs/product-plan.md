@@ -10,19 +10,22 @@ run contracts, tools, source/report graphs, citations, and the frontend event st
 ## V1 Workflow
 
 1. User submits research intent, local documents, web preferences, output style, and depth.
-2. Planner performs fast reconnaissance and proposes topics plus an outline.
-3. User approves or edits topics before deeper research begins.
-4. Researcher agents explore topics using breadth-first, depth-first, or hybrid strategy.
-5. Search as Code can fan out web, document, connector, and codebase retrieval programs
+2. API persists the user message, assets, conversation state, and research run.
+3. Worker assembles a bounded context pack from conversation history, graph results,
+   knowledge files, assets, and DeepAgents checkpoint state.
+4. Planner performs fast reconnaissance and proposes topics plus an outline.
+5. User approves or edits topics before deeper research begins.
+6. Researcher agents explore topics using breadth-first, depth-first, or hybrid strategy.
+7. Search as Code can fan out web, document, connector, and codebase retrieval programs
    inside a bounded sandbox when the question requires broad evidence gathering.
-6. New sources create shallow knowledge cards and graph nodes first; deeper ingestion
+8. New sources create shallow knowledge cards and graph nodes first; deeper ingestion
    happens only when a question requires more detail.
-7. Graph-guided retrieval returns known source files, chunks, page ranges, code symbols,
+9. Graph-guided retrieval returns known source files, chunks, page ranges, code symbols,
    and relationships; the agent decides relevance and whether to deepen the original
    source.
-8. Writer streams Markdown sections once evidence thresholds are met.
-9. Editor reviews draft sections against the source graph and suggests improvements.
-10. User receives a final Markdown report with citations and generated artifacts.
+10. Writer streams Markdown sections once evidence thresholds are met.
+11. Editor reviews draft sections against the source graph and suggests improvements.
+12. User receives a final Markdown report with citations and generated artifacts.
 
 ## Delivery Principles
 
@@ -46,8 +49,11 @@ run contracts, tools, source/report graphs, citations, and the frontend event st
 
 ### M2: Runtime Shell
 
+- Add product persistence for users, workspaces, conversations, messages, assets, runs,
+  events, interventions, and DeepAgents thread mappings.
 - Add FastAPI service with run creation and health endpoints.
 - Add worker entrypoint and queue abstraction.
+- Add context pack assembly for starting/resuming DeepAgents runs.
 - Add Docker Compose for API, worker, Postgres, Redis, Neo4j, MinIO, and web.
 - Add CI for Python lint/type/test and frontend checks.
 
@@ -89,3 +95,5 @@ run contracts, tools, source/report graphs, citations, and the frontend event st
 - Should model/provider keys be user-supplied in V1?
 - Which citation style should V1 default to?
 - Should slide export remain a stub until after V1?
+- Should one conversation map to one DeepAgents thread, or should every research run
+  create a child thread?

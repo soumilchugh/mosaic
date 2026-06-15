@@ -16,7 +16,7 @@ packages/research_core    Deep research roles, graph schema, prompts, workflows
 web        Next.js frontend
 api        FastAPI backend
 worker     Background research worker
-postgres   Runs, reports, metadata
+postgres   Users, workspaces, conversations, runs, events, graph, metadata
 redis      Queue, pub/sub, transient state
 neo4j      Source and report graphs
 minio      Local object storage
@@ -26,9 +26,86 @@ Neo4j should be optional at first. V1 can use Postgres as the graph repository f
 edges, chunks, ingestion state, and file/source/code references, then project to Neo4j
 later if multi-hop graph queries become central.
 
+## Persistence Model
+
+Postgres is the product system of record. Object storage stores file bytes. DeepAgents
+uses durable thread/checkpoint persistence keyed by product conversations and research
+runs.
+
+```text
+User
+  -> Workspace
+    -> Conversation
+      -> Message
+      -> ResearchRun
+        -> ResearchEvent
+        -> InterventionRequest
+        -> DeepAgentsThread
+    -> Asset
+    -> KnowledgeFile
+    -> GraphNode / GraphEdge
+```
+
+Core Postgres tables should include:
+
+```text
+users
+workspaces
+workspace_memberships
+conversations
+messages
+research_runs
+research_events
+intervention_requests
+deepagents_threads
+assets
+knowledge_files
+graph_nodes
+graph_edges
+graph_chunks
+ingestion_runs
+```
+
+Object storage, MinIO locally and S3 in production, owns:
+
+- uploaded files
+- fetched source snapshots
+- generated report artifacts
+- charts, images, slide drafts, exports
+- code archives or repository snapshots when needed
+
+Postgres stores object metadata and storage URIs, not large file bytes.
+
+## Context Assembly
+
+Every new user turn should build a bounded context pack before starting or resuming
+DeepAgents:
+
+```text
+conversation summary
+recent messages
+active research run state
+pending interventions
+workspace research map
+graph retrieval result sets
+selected source/code cards
+asset metadata
+DeepAgents thread/checkpoint ID
+```
+
+The context pack should be reproducible from persisted state. DeepAgents can maintain its
+own checkpoint state, but the product must persist the user-visible projection: messages,
+events, interventions, assets, and knowledge graph updates.
+
 ## API Shape
 
 ```text
+POST /workspaces
+GET  /workspaces/{workspace_id}
+POST /conversations
+GET  /conversations/{conversation_id}
+POST /conversations/{conversation_id}/messages
+POST /assets
 POST /research-runs
 GET  /research-runs/{run_id}
 GET  /research-runs/{run_id}/report
