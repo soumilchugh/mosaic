@@ -66,6 +66,9 @@ graph_chunks
 ingestion_runs
 ```
 
+See [data-model.md](data-model.md) for the ERD, table responsibilities, and initial
+field-level schema.
+
 Object storage, MinIO locally and S3 in production, owns:
 
 - uploaded files
