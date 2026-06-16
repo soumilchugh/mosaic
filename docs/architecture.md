@@ -16,7 +16,7 @@ packages/research_core    Deep research roles, graph schema, prompts, workflows
 web        Next.js frontend
 api        FastAPI backend
 worker     Background research worker
-postgres   Users, workspaces, conversations, runs, events, graph, metadata
+postgres   Users, projects, knowledge scopes, conversations, runs, events, graph, metadata
 redis      Queue, pub/sub, transient state
 neo4j      Source and report graphs
 minio      Local object storage
@@ -34,7 +34,9 @@ runs.
 
 ```text
 User
-  -> Workspace
+  -> GlobalKnowledgeScope
+  -> Project
+    -> ProjectKnowledgeScope
     -> Conversation
       -> Message
       -> ResearchRun
@@ -50,8 +52,10 @@ Core Postgres tables should include:
 
 ```text
 users
-workspaces
-workspace_memberships
+organizations
+projects
+project_memberships
+knowledge_scopes
 conversations
 messages
 research_runs
@@ -89,7 +93,9 @@ conversation summary
 recent messages
 active research run state
 pending interventions
-workspace research map
+project research map
+project knowledge scope results
+user/org global knowledge scope results
 graph retrieval result sets
 selected source/code cards
 asset metadata
@@ -103,8 +109,9 @@ events, interventions, assets, and knowledge graph updates.
 ## API Shape
 
 ```text
-POST /workspaces
-GET  /workspaces/{workspace_id}
+POST /projects
+GET  /projects/{project_id}
+GET  /knowledge-scopes/{knowledge_scope_id}
 POST /conversations
 GET  /conversations/{conversation_id}
 POST /conversations/{conversation_id}/messages

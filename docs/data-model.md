@@ -13,12 +13,15 @@ The data model separates durable product state from agent execution state and fi
 
 ```mermaid
 erDiagram
-    users ||--o{ workspace_memberships : belongs_to
-    workspaces ||--o{ workspace_memberships : has
-    workspaces ||--o{ conversations : owns
-    workspaces ||--o{ assets : owns
-    workspaces ||--o{ knowledge_files : owns
-    workspaces ||--o{ graph_nodes : owns
+    users ||--o{ project_memberships : belongs_to
+    users ||--o{ knowledge_scopes : owns_global
+    organizations ||--o{ knowledge_scopes : owns_global
+    projects ||--o{ project_memberships : has
+    projects ||--o{ conversations : owns
+    projects ||--o{ knowledge_scopes : owns_local
+    knowledge_scopes ||--o{ assets : owns
+    knowledge_scopes ||--o{ knowledge_files : owns
+    knowledge_scopes ||--o{ graph_nodes : owns
     conversations ||--o{ messages : has
     conversations ||--o{ research_runs : starts
     conversations ||--o{ deepagents_threads : maps_to
@@ -35,11 +38,12 @@ erDiagram
     graph_nodes ||--o{ ingestion_runs : target
 ```
 
-## Identity And Workspace Tables
+## Identity, Project, And Knowledge Scope Tables
 
 ### `users`
 
-Represents an account that can own or participate in workspaces.
+Represents an account that can own or participate in projects and global knowledge
+scopes.
 
 Important fields:
 
@@ -56,10 +60,10 @@ Notes:
 - V1 can keep auth simple, but every durable object should be traceable to a user.
 - External auth provider IDs can be added later.
 
-### `workspaces`
+### `organizations`
 
-A workspace is the top-level boundary for assets, conversations, graph data, and knowledge
-files.
+Optional team boundary. V1 can defer multi-user org features, but the model should not
+block organization-level knowledge later.
 
 Important fields:
 
@@ -73,19 +77,79 @@ updated_at timestamptz
 archived_at timestamptz null
 ```
 
-### `workspace_memberships`
+### `projects`
 
-Connects users to workspaces.
+A project is the top-level work container for conversations and project-specific
+knowledge. This is what earlier docs called a workspace.
 
 Important fields:
 
 ```text
-workspace_id uuid references workspaces(id)
+id uuid primary key
+organization_id uuid references organizations(id) null
+name text not null
+slug text
+created_by_user_id uuid references users(id)
+default_knowledge_scope_id uuid references knowledge_scopes(id) null
+status text -- active, archived
+metadata jsonb
+created_at timestamptz
+updated_at timestamptz
+archived_at timestamptz null
+```
+
+Notes:
+
+- A user can have many projects.
+- Each project has a local knowledge scope.
+- Retrieval can also include user-global or organization-global knowledge scopes.
+
+### `project_memberships`
+
+Connects users to projects.
+
+Important fields:
+
+```text
+project_id uuid references projects(id)
 user_id uuid references users(id)
 role text -- owner, editor, viewer
 created_at timestamptz
-primary key (workspace_id, user_id)
+primary key (project_id, user_id)
 ```
+
+### `knowledge_scopes`
+
+A knowledge scope owns reusable assets, knowledge files, and graph records. Scopes let
+the system distinguish user-global knowledge from project-local knowledge.
+
+Important fields:
+
+```text
+id uuid primary key
+scope_type text -- user_global, organization_global, project
+owner_user_id uuid references users(id) null
+owner_organization_id uuid references organizations(id) null
+project_id uuid references projects(id) null
+name text not null
+description text
+visibility text -- private, project, organization
+created_at timestamptz
+updated_at timestamptz
+```
+
+Retrieval order:
+
+```text
+1. current conversation/run state
+2. current project knowledge scope
+3. user global knowledge scope
+4. organization global knowledge scope, if enabled
+5. external sources/connectors
+```
+
+This supports reusable knowledge without mixing project-specific evidence into every
+answer.
 
 ## Conversation And Session Tables
 
@@ -98,7 +162,7 @@ Important fields:
 
 ```text
 id uuid primary key
-workspace_id uuid references workspaces(id)
+project_id uuid references projects(id)
 created_by_user_id uuid references users(id)
 title text
 status text -- active, archived
@@ -144,7 +208,7 @@ Important fields:
 
 ```text
 id uuid primary key
-workspace_id uuid references workspaces(id)
+project_id uuid references projects(id)
 conversation_id uuid references conversations(id) null
 research_run_id uuid references research_runs(id) null
 thread_id text not null
@@ -172,7 +236,7 @@ Important fields:
 
 ```text
 id uuid primary key
-workspace_id uuid references workspaces(id)
+project_id uuid references projects(id)
 conversation_id uuid references conversations(id)
 created_by_user_id uuid references users(id)
 intent text not null
@@ -200,7 +264,7 @@ Important fields:
 
 ```text
 id uuid primary key
-workspace_id uuid references workspaces(id)
+project_id uuid references projects(id)
 conversation_id uuid references conversations(id)
 research_run_id uuid references research_runs(id)
 sequence bigint not null
@@ -226,7 +290,7 @@ Important fields:
 
 ```text
 id uuid primary key
-workspace_id uuid references workspaces(id)
+project_id uuid references projects(id)
 conversation_id uuid references conversations(id)
 research_run_id uuid references research_runs(id)
 deepagents_thread_id uuid references deepagents_threads(id)
@@ -249,7 +313,8 @@ Important fields:
 
 ```text
 id uuid primary key
-workspace_id uuid references workspaces(id)
+knowledge_scope_id uuid references knowledge_scopes(id)
+project_id uuid references projects(id) null
 conversation_id uuid references conversations(id) null
 research_run_id uuid references research_runs(id) null
 created_by_user_id uuid references users(id) null
@@ -279,7 +344,8 @@ Important fields:
 
 ```text
 id uuid primary key
-workspace_id uuid references workspaces(id)
+knowledge_scope_id uuid references knowledge_scopes(id)
+project_id uuid references projects(id) null
 conversation_id uuid references conversations(id) null
 research_run_id uuid references research_runs(id) null
 asset_id uuid references assets(id) null
@@ -292,13 +358,15 @@ status text -- active, stale, archived
 created_by text -- user, agent, system
 created_at timestamptz
 updated_at timestamptz
-unique(workspace_id, path)
+unique(knowledge_scope_id, path)
 ```
 
 Notes:
 
 - These are the files the agent can read and update.
 - They are also graph entry points through `graph_nodes.file_path`.
+- `knowledge_scope_id` controls whether a file is global, organization-level, or
+  project-local.
 
 ## Graph Tables
 
@@ -310,7 +378,8 @@ Important fields:
 
 ```text
 id uuid primary key
-workspace_id uuid references workspaces(id)
+knowledge_scope_id uuid references knowledge_scopes(id)
+project_id uuid references projects(id) null
 type text -- topic, source, document, repository, commit, code_file, symbol, chunk, entity, claim, fact, report_section, artifact
 external_id text null
 title text
@@ -336,14 +405,15 @@ Important fields:
 
 ```text
 id uuid primary key
-workspace_id uuid references workspaces(id)
+knowledge_scope_id uuid references knowledge_scopes(id)
+project_id uuid references projects(id) null
 from_node_id uuid references graph_nodes(id)
 relation text -- COVERS, DESCRIBED_BY, HAS_CHUNK, SUPPORTS, CONTRADICTS, CITES, DEFINES, DEPENDS_ON, DERIVED_FROM
 to_node_id uuid references graph_nodes(id)
 confidence numeric null
 metadata jsonb
-created_at timestamptz
-updated_at timestamptz
+created_at timestampt
+updated_at timestampt
 ```
 
 Notes:
@@ -359,7 +429,8 @@ Important fields:
 
 ```text
 id uuid primary key
-workspace_id uuid references workspaces(id)
+knowledge_scope_id uuid references knowledge_scopes(id)
+project_id uuid references projects(id) null
 node_id uuid references graph_nodes(id)
 knowledge_file_id uuid references knowledge_files(id) null
 asset_id uuid references assets(id) null
@@ -386,7 +457,8 @@ Important fields:
 
 ```text
 id uuid primary key
-workspace_id uuid references workspaces(id)
+knowledge_scope_id uuid references knowledge_scopes(id)
+project_id uuid references projects(id) null
 research_run_id uuid references research_runs(id) null
 target_node_id uuid references graph_nodes(id)
 mode text -- shallow_card, section_indexed, topic_deepened, claims_and_citations, code_symbol_trace
@@ -440,11 +512,12 @@ reproducible.
 Initial indexes:
 
 ```text
-workspace_id on all workspace-scoped tables
+project_id on project-scoped runtime tables
+knowledge_scope_id on assets, knowledge_files, graph_nodes, graph_edges, graph_chunks
 conversation_id on messages, research_runs, research_events
 research_run_id on events, interventions, ingestion_runs
 unique(research_run_id, sequence) for event replay
-unique(workspace_id, path) for knowledge_files
+unique(knowledge_scope_id, path) for knowledge_files
 from_node_id, to_node_id, relation on graph_edges
 type, external_id on graph_nodes
 asset checksum for dedupe
@@ -461,6 +534,10 @@ Later indexes:
 
 - Should V1 use one DeepAgents thread per conversation plus child threads for research
   runs, or only run-level threads?
+- Should the UI call the top-level container "project" everywhere, or keep "workspace" as
+  the product label while using `projects` internally?
+- Should user-global knowledge be enabled in V1 or reserved until project-local retrieval
+  is stable?
 - Should report sections get dedicated tables immediately or stay as graph-backed
   knowledge files?
 - Should graph chunks store full text in Postgres or only previews plus file/object

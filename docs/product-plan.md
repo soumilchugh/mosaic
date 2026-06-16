@@ -49,8 +49,8 @@ run contracts, tools, source/report graphs, citations, and the frontend event st
 
 ### M2: Runtime Shell
 
-- Add product persistence for users, workspaces, conversations, messages, assets, runs,
-  events, interventions, and DeepAgents thread mappings.
+- Add product persistence for users, projects, knowledge scopes, conversations, messages,
+  assets, runs, events, interventions, and DeepAgents thread mappings.
 - Add FastAPI service with run creation and health endpoints.
 - Add worker entrypoint and queue abstraction.
 - Add context pack assembly for starting/resuming DeepAgents runs.
@@ -95,5 +95,6 @@ run contracts, tools, source/report graphs, citations, and the frontend event st
 - Should model/provider keys be user-supplied in V1?
 - Which citation style should V1 default to?
 - Should slide export remain a stub until after V1?
+- Should user-global knowledge be enabled in V1 or should V1 start project-local only?
 - Should one conversation map to one DeepAgents thread, or should every research run
   create a child thread?

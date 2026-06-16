@@ -42,16 +42,18 @@ Everything becomes a product contract first.
 
 ## Product Persistence And Sessions
 
-The product needs durable user, workspace, conversation, asset, event, and graph state
-outside of DeepAgents. DeepAgents should be resumable through product-owned IDs, but it
-should not be the only source of truth for user-visible history.
+The product needs durable user, project, knowledge-scope, conversation, asset, event, and
+graph state outside of DeepAgents. DeepAgents should be resumable through product-owned
+IDs, but it should not be the only source of truth for user-visible history.
 
 Postgres is the V1 system of record:
 
 ```text
 users
-workspaces
-workspace_memberships
+organizations
+projects
+project_memberships
+knowledge_scopes
 conversations
 messages
 research_runs
@@ -77,7 +79,7 @@ code archives or repository snapshots
 ```
 
 `assets` records in Postgres point to MinIO/S3 object URIs, content hashes, MIME types,
-owners, workspace IDs, and source provenance.
+owners, project IDs, knowledge scope IDs, and source provenance.
 
 DeepAgents thread and checkpoint state should be keyed by product IDs:
 
@@ -99,7 +101,7 @@ persisted product state:
 2. recent messages
 3. active research run state
 4. pending interventions
-5. relevant workspace/project metadata
+5. relevant project and knowledge-scope metadata
 6. graph-guided retrieval result sets
 7. selected source/code cards and topic files
 8. asset metadata and accessible workspace paths
@@ -436,7 +438,7 @@ threads.
 
 Persist:
 
-- users, workspaces, conversations, messages, and assets in Postgres
+- users, projects, knowledge scopes, conversations, messages, and assets in Postgres
 - `ResearchRun` state in Postgres
 - event stream in Postgres
 - intervention requests and resume decisions in Postgres
