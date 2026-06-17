@@ -368,6 +368,60 @@ Notes:
 - `knowledge_scope_id` controls whether a file is global, organization-level, or
   project-local.
 
+## How The Graph References Files
+
+The graph should distinguish original file bytes from agent-readable knowledge files.
+
+Use `asset_id` when a graph record points to original or generated file bytes in object
+storage:
+
+```text
+uploaded PDF
+uploaded image
+fetched web snapshot
+code archive
+generated chart
+exported slide deck
+```
+
+Use `knowledge_file_id` when a graph record points to a markdown/text file in the virtual
+workspace:
+
+```text
+source_017.md
+topic_supply_chain.md
+repo_card.md
+research_map.md
+report_section_01.md
+image_004.md
+```
+
+A graph node can point to both when both representations exist:
+
+```text
+GraphNode(type = source)
+  asset_id = original PDF in object storage
+  knowledge_file_id = source card markdown file
+```
+
+Use `graph_chunks` when the graph needs to reference a specific page range, section, byte
+range, or code line range inside an asset or knowledge file.
+
+Example:
+
+```text
+Source017
+  -> asset_id: asset_pdf_123
+  -> knowledge_file_id: kf_source_017_md
+  -> HAS_CHUNK: graph_chunk pages 59-80
+```
+
+This lets graph-guided retrieval return:
+
+- the source/card file the agent should read first
+- the raw asset to inspect if deeper evidence is needed
+- the exact page/section/line range already known by the graph
+
 ## Graph Tables
 
 ### `graph_nodes`
@@ -412,8 +466,8 @@ relation text -- COVERS, DESCRIBED_BY, HAS_CHUNK, SUPPORTS, CONTRADICTS, CITES, 
 to_node_id uuid references graph_nodes(id)
 confidence numeric null
 metadata jsonb
-created_at timestampt
-updated_at timestampt
+created_at timestamptz
+updated_at timestamptz
 ```
 
 Notes:
