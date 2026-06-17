@@ -10,6 +10,10 @@ packages/harness_core     DeepAgents adapter, event mapping, tool bridges
 packages/research_core    Deep research roles, graph schema, prompts, workflows
 ```
 
+The frontend workspace is report-first: a left chat/control panel, central report editor,
+and right evidence/assets/graph/activity panel. See
+[frontend-workspace.md](frontend-workspace.md) for the editor and visual asset design.
+
 ## Local Services
 
 ```text

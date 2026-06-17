@@ -25,7 +25,9 @@ run contracts, tools, source/report graphs, citations, and the frontend event st
    source.
 10. Writer streams Markdown sections once evidence thresholds are met.
 11. Editor reviews draft sections against the source graph and suggests improvements.
-12. User receives a final Markdown report with citations and generated artifacts.
+12. User edits the report in a report-first workspace with chat controls, evidence
+    panels, and visual asset blocks.
+13. User receives a final Markdown report with citations and generated artifacts.
 
 ## Delivery Principles
 
@@ -85,6 +87,7 @@ run contracts, tools, source/report graphs, citations, and the frontend event st
 - File-native graph projection.
 - Report graph model.
 - Citation model.
+- Report editor workspace with visual asset blocks.
 - Editor criteria and suggestion events.
 
 ## Initial Open Questions

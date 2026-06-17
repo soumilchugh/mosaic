@@ -538,9 +538,24 @@ V1 recommendation:
 knowledge_files(file_type = report_section)
 graph_nodes(type = report_section)
 graph_edges(report_section)-[:CITES]->(source/chunk/code_reference)
+graph_edges(report_section)-[:USES_ASSET]->(asset/artifact)
 ```
 
 This keeps report state aligned with the same file-native graph model.
+
+Visual report blocks should reference `asset_id` for rendered/generated/uploaded visuals
+and use graph edges for provenance:
+
+```text
+ImageBlock/ChartBlock/TableBlock
+  -> asset_id
+  -> citation_ids
+  -> graph_edges(report_section)-[:USES_ASSET]->(asset)
+```
+
+The canonical report can remain Markdown in V1, with structured block metadata stored in
+frontmatter or `knowledge_files.frontmatter`. Dedicated report block tables can be added
+later if collaboration or rich visual editing requires stricter structure.
 
 ## Context Pack Inputs
 
