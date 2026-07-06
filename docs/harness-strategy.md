@@ -13,11 +13,11 @@ rebuilding an agent runtime inside this repo.
 
 The application owns product contracts and persistence:
 
-- `ResearchRun`
-- `ResearchTask`
-- `ResearchEvent`
-- research tool definitions
-- source and report graph models
+- `AgentTask`
+- `ProductEvent`
+- `ResearchRun` as one application-specific task type
+- ingestion, memory, research, and report tool definitions
+- source, memory, and report graph models
 - citation models
 - API, worker, and WebSocket integration
 
@@ -36,8 +36,8 @@ DeepAgents owns agent execution:
 
 M1 should prove the integration path:
 
-1. Define product-level run, task, and event contracts.
-2. Define a small adapter interface for starting a DeepAgents-backed run.
+1. Define product-level agent task and event contracts.
+2. Define a small adapter interface for starting a DeepAgents-backed task.
 3. Map DeepAgents stream events into product events.
 4. Expose one simple tool through DeepAgents.
 5. Run deterministic tests with fake adapters and one SDK-backed smoke path.
@@ -48,20 +48,21 @@ runtime unless DeepAgents cannot support a required product contract.
 ## Adapter Shape
 
 ```text
-ResearchTask
+AgentTask
   -> HarnessAdapter.start(task)
     -> DeepAgents agent stream
-      -> ResearchEvent
+      -> ProductEvent
 ```
 
-The rest of the application consumes `ResearchEvent`, not DeepAgents-specific stream
+The rest of the application consumes `ProductEvent`, not DeepAgents-specific stream
 objects.
 
 ## Tool Strategy
 
-Research tools should be ordinary Python functions or LangChain-compatible tools that can
-be passed into DeepAgents. Our code should define product metadata, validation,
-permissions, and structured results around those tools where needed.
+Knowledge, memory, ingestion, research, and report tools should be ordinary Python
+functions or LangChain-compatible tools that can be passed into DeepAgents. Our code
+should define product metadata, validation, permissions, and structured results around
+those tools where needed.
 
 ## Open Questions
 
