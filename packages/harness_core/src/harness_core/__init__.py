@@ -10,7 +10,15 @@ from harness_core.adapters import (
 )
 from harness_core.events import Event, EventType
 from harness_core.runtime import AgentRuntime
-from harness_core.tools import Tool, ToolCall, ToolRegistry, ToolResult
+from harness_core.tools import (
+    DeepAgentsToolAdapter,
+    Tool,
+    ToolCall,
+    ToolMetadata,
+    ToolRegistry,
+    ToolResult,
+    tool_result_to_event_payload,
+)
 
 __all__ = [
     "AgentRuntime",
@@ -22,8 +30,11 @@ __all__ = [
     "HarnessMessage",
     "HarnessResumeRequest",
     "HarnessRunRequest",
+    "DeepAgentsToolAdapter",
     "Tool",
     "ToolCall",
+    "ToolMetadata",
     "ToolRegistry",
     "ToolResult",
+    "tool_result_to_event_payload",
 ]
