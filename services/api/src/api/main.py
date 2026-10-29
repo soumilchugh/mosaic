@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from harness_core import FakeHarnessAdapter, HarnessAdapter
 
-app = FastAPI(title="Agent Harness API")
+app = FastAPI(title="Mosaic API")
 app.state.harness_adapter = FakeHarnessAdapter()
 
 

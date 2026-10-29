@@ -38,10 +38,13 @@ CI currently runs:
 
 - Python lint: `ruff check .`
 - Python tests: `pytest`
-- Web placeholder tests: `npm test` in `apps/web`
+- Web lint: `npm run lint` in `apps/web`
+- Web type checking: `npm run typecheck` in `apps/web`
+- Web unit tests: `npm test` in `apps/web`
+- Web production build: `npm run build` in `apps/web`
+- Docker Compose validation and service image builds
 
-As the frontend becomes real, web CI should grow to install dependencies, run type checks,
-lint, unit tests, and eventually Playwright smoke tests.
+Playwright smoke tests will be added once the API-backed knowledge workflow is wired.
 
 ## Review Cadence
 

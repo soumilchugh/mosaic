@@ -1,4 +1,21 @@
 services:
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
   api:
     build:
       context: .
@@ -7,10 +24,19 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - postgres
-      - redis
-      - neo4j
-      - minio
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   worker:
     build:
@@ -18,39 +44,24 @@ services:
       dockerfile: services/worker/Dockerfile
     command: python -m worker.main
     depends_on:
-      - postgres
-      - redis
-      - neo4j
-      - minio
+      postgres:
+        condition: service_healthy
 
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: agent_harness
-      POSTGRES_USER: agent_harness
-      POSTGRES_PASSWORD: agent_harness
+      POSTGRES_DB: ${POSTGRES_DB:-mosaic}
+      POSTGRES_USER: ${POSTGRES_USER:-mosaic}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mosaic}
     ports:
       - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mosaic} -d ${POSTGRES_DB:-mosaic}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-
-  neo4j:
-    image: neo4j:5
-    environment:
-      NEO4J_AUTH: neo4j/agent_harness
-    ports:
-      - "7474:7474"
-      - "7687:7687"
-
-  minio:
-    image: minio/minio
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: agent_harness
-      MINIO_ROOT_PASSWORD: agent_harness
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+volumes:
+  postgres-data:

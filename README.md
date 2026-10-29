@@ -141,11 +141,20 @@ docs                      Product, architecture, data model, and delivery plans
 ## Current Status
 
 The platform architecture, evidence model, deployment strategy, milestones, and GitHub
-issue structure are defined. The repository contains the initial Python service/package
-skeleton, tests, Docker scaffolding, and CI. Shared platform contracts, the DeepAgents
-adapter, tool integration, and a minimal knowledge-chat path are now implemented.
+issue structure are defined. The repository contains a functional Next.js knowledge
+workspace, initial Python services and packages, Docker scaffolding, and CI. Shared
+platform contracts, the DeepAgents adapter, tool integration, and a minimal
+knowledge-chat path are implemented.
 
 ## Local Development
+
+Prerequisites:
+
+- Python 3.12 or newer
+- Node.js 22 or newer
+- Docker with Docker Compose
+
+Run the Python checks:
 
 ```bash
 python -m venv .venv
@@ -154,6 +163,23 @@ pip install -e ".[dev]"
 pytest
 ```
 
-The Docker Compose stack and frontend package are still skeletal. They will be expanded
-as the runtime, persistence, ingestion, and knowledge-workspace milestones are
-implemented.
+Run the web workspace:
+
+```bash
+cd apps/web
+npm ci
+npm run dev
+```
+
+The workspace is available at `http://localhost:3000`; the API health endpoint is at
+`http://localhost:8000/health`.
+
+Build and run the local service stack:
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+The database schema, durable queue, storage integration, and API-backed frontend flows
+will be added in the next runtime milestones.
