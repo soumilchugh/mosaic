@@ -1068,8 +1068,6 @@ Later indexes and projections:
 - Which candidate types and confidence policies are safe for automatic promotion?
 - Which query classes justify graph traversal after latency, cost, and retrieval evaluation?
 - Which entity namespaces have strong deterministic identity keys in V1?
-- Which ORM/migration stack should we use: SQLAlchemy + Alembic, SQLModel + Alembic, or
-  plain SQL migrations?
 - Which connector should be first after local uploads: Slack, GitHub, Notion, or Google
   Drive?
 - Should memory writes require explicit approval by default, or only for sensitive and

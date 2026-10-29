@@ -104,6 +104,22 @@ Object storage, MinIO locally and Supabase Storage in V1 production, owns:
 
 Postgres stores object metadata and storage URIs, not large file bytes.
 
+### Repository Boundary
+
+`knowledge_core.persistence` exposes the shared repository interface used by the API and
+worker. Product code passes Pydantic contracts to repositories and does not depend on
+SQLAlchemy records or write ad hoc queries.
+
+API requests create a `ProjectContext` with both the authenticated user and project.
+Repository construction verifies ownership or project membership, then every operation
+enforces the same project and knowledge-scope boundary on the record and its references.
+Trusted background workers use `ProjectContext.for_worker(project_id)` after receiving a
+validated project-scoped task.
+
+The SQLAlchemy repository set participates in the caller's database session; the API or
+worker transaction owns commit and rollback. The matching in-memory repository set is
+used for deterministic unit tests and applies the same access and cross-project rules.
+
 ## Context Assembly
 
 Every new user turn should build a bounded context pack before starting or resuming

@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from decimal import Decimal
 from enum import StrEnum
 from typing import Any, Self
 from uuid import UUID, uuid4
@@ -42,6 +43,12 @@ class MessageRole(StrEnum):
     USER = "user"
     ASSISTANT = "assistant"
     SYSTEM = "system"
+
+
+class MessageContentFormat(StrEnum):
+    MARKDOWN = "markdown"
+    PLAIN_TEXT = "plain_text"
+    JSON = "json"
 
 
 class AgentTaskType(StrEnum):
@@ -90,6 +97,22 @@ class KnowledgeFileStatus(StrEnum):
     STALE = "stale"
     SUPERSEDED = "superseded"
     ARCHIVED = "archived"
+
+
+class GraphRecordStatus(StrEnum):
+    ACTIVE = "active"
+    CORRECTED = "corrected"
+    SUPERSEDED = "superseded"
+    RETRACTED = "retracted"
+    ARCHIVED = "archived"
+
+
+class IngestionRunStatus(StrEnum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 class Project(ContractModel):
@@ -147,6 +170,8 @@ class Message(ContractModel):
     role: MessageRole
     content: str = Field(min_length=1)
     sequence: int = Field(ge=0)
+    content_format: MessageContentFormat = MessageContentFormat.MARKDOWN
+    user_id: UUID | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=utc_now)
 
@@ -190,12 +215,15 @@ class Asset(ContractModel):
     size_bytes: int = Field(ge=0)
     checksum_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     storage_uri: str = Field(min_length=1)
+    source_url: str | None = None
     project_id: UUID | None = None
     conversation_id: UUID | None = None
     agent_task_id: UUID | None = None
     created_by_user_id: UUID | None = None
     source_metadata: dict[str, Any] = Field(default_factory=dict)
+    status: str = "available"
     created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
 
 
 class KnowledgeFile(ContractModel):
@@ -206,9 +234,129 @@ class KnowledgeFile(ContractModel):
     title: str = Field(min_length=1, max_length=500)
     content_hash: str = Field(min_length=1, max_length=200)
     project_id: UUID | None = None
+    conversation_id: UUID | None = None
     asset_id: UUID | None = None
     status: KnowledgeFileStatus = KnowledgeFileStatus.ACTIVE
     frontmatter: dict[str, Any] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    created_by: str = "agent"
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+
+
+class GraphSchemaVersion(ContractModel):
+    id: UUID = Field(default_factory=uuid4)
+    object_kind: str
+    type_name: str
+    version: int = Field(gt=0)
+    json_schema: dict[str, Any] = Field(default_factory=dict)
+    allowed_from_types: list[str] | None = None
+    allowed_to_types: list[str] | None = None
+    promotion_policy: dict[str, Any] = Field(default_factory=dict)
+    status: str = "draft"
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class GraphNode(ContractModel):
+    id: UUID = Field(default_factory=uuid4)
+    knowledge_scope_id: UUID
+    project_id: UUID
+    type: str
+    schema_version: int = Field(gt=0)
+    schema_object_kind: str = "node"
+    external_id: str | None = None
+    canonical_key: str | None = None
+    title: str | None = None
+    summary: str | None = None
+    knowledge_file_id: UUID | None = None
+    asset_id: UUID | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    ingestion_level: str | None = None
+    status: GraphRecordStatus = GraphRecordStatus.ACTIVE
+    valid_from: datetime | None = None
+    valid_until: datetime | None = None
+    source_revision: str | None = None
+    superseded_by_node_id: UUID | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class GraphEdge(ContractModel):
+    id: UUID = Field(default_factory=uuid4)
+    knowledge_scope_id: UUID
+    project_id: UUID
+    from_node_id: UUID
+    relation: str
+    to_node_id: UUID
+    schema_version: int = Field(gt=0)
+    schema_object_kind: str = "edge"
+    confidence: Decimal | None = Field(default=None, ge=0, le=1)
+    status: GraphRecordStatus = GraphRecordStatus.ACTIVE
+    extraction_method: str
+    extraction_policy_version: str | None = None
+    source_revision: str | None = None
+    valid_from: datetime | None = None
+    valid_until: datetime | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class GraphChunk(ContractModel):
+    id: UUID = Field(default_factory=uuid4)
+    knowledge_scope_id: UUID
+    project_id: UUID
+    node_id: UUID
+    chunk_index: int = Field(ge=0)
+    source_revision: str
+    text_content: str
+    content_hash: str
+    knowledge_file_id: UUID | None = None
+    asset_id: UUID | None = None
+    page_start: int | None = None
+    page_end: int | None = None
+    section_path: list[str] | None = None
+    char_start: int | None = None
+    char_end: int | None = None
+    line_start: int | None = None
+    line_end: int | None = None
+    bounding_boxes: dict[str, Any] | None = None
+    sheet_name: str | None = None
+    cell_range: str | None = None
+    repository: str | None = None
+    commit_sha: str | None = None
+    file_path: str | None = None
+    symbol: str | None = None
+    external_permalink: str | None = None
+    external_item_id: str | None = None
+    parser_name: str | None = None
+    parser_version: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class IngestionRun(ContractModel):
+    id: UUID = Field(default_factory=uuid4)
+    knowledge_scope_id: UUID
+    project_id: UUID
+    mode: str
+    agent_task_id: UUID | None = None
+    asset_id: UUID | None = None
+    target_node_id: UUID | None = None
+    status: IngestionRunStatus = IngestionRunStatus.QUEUED
+    coverage: dict[str, Any] = Field(default_factory=dict)
+    budget: dict[str, Any] = Field(default_factory=dict)
+    extractor_versions: dict[str, Any] = Field(default_factory=dict)
+    source_revision: str | None = None
+    result_summary: str | None = None
+    error: str | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+
+    @model_validator(mode="after")
+    def validate_target(self) -> Self:
+        if self.asset_id is None and self.target_node_id is None:
+            raise ValueError("an ingestion run requires an asset or target node")
+        return self
