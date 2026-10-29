@@ -1,6 +1,11 @@
-# Agent Harness
+# Mosaic
 
-Private working repository for an agentic multimodal knowledge and memory platform.
+Mosaic brings your documents, conversations, and connected apps into one intelligent
+workspace. It helps your AI remember what matters, find trustworthy answers, and learn
+as you use it.
+
+This private repository contains the early development of Mosaic: a multimodal knowledge
+and memory platform for people and AI agents.
 
 The goal is to turn local files, connected data sources, conversations, and agent work
 into a living, evidence-backed knowledge base. Users should be able to ask questions,
@@ -137,9 +142,8 @@ docs                      Product, architecture, data model, and delivery plans
 
 The platform architecture, evidence model, deployment strategy, milestones, and GitHub
 issue structure are defined. The repository contains the initial Python service/package
-skeleton, tests, Docker scaffolding, and CI. Shared platform contracts, DeepAgents adapter
-work, tool integration, and a minimal knowledge-chat path are currently being developed
-through focused pull requests.
+skeleton, tests, Docker scaffolding, and CI. Shared platform contracts, the DeepAgents
+adapter, tool integration, and a minimal knowledge-chat path are now implemented.
 
 ## Local Development
 
