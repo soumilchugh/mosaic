@@ -880,8 +880,9 @@ Important fields:
 id uuid primary key
 knowledge_scope_id uuid references knowledge_scopes(id)
 project_id uuid references projects(id) null
-research_run_id uuid references research_runs(id) null
-target_node_id uuid references graph_nodes(id)
+agent_task_id uuid references agent_tasks(id) null
+asset_id uuid references assets(id) null
+target_node_id uuid references graph_nodes(id) null
 mode text -- shallow_card, section_indexed, topic_deepened, claims_and_citations, code_symbol_trace
 status text -- queued, running, completed, failed, cancelled
 coverage jsonb -- pages, sections, files, symbols, topics
@@ -894,6 +895,9 @@ started_at timestamptz null
 completed_at timestamptz null
 created_at timestamptz
 ```
+
+An initial upload targets `asset_id` because its graph node does not exist yet. Targeted
+deepening can point to `target_node_id`; a run must have at least one of these targets.
 
 ## Reports And Citations
 
