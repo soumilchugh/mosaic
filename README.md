@@ -4,8 +4,8 @@ Mosaic brings your documents, conversations, and connected apps into one intelli
 workspace. It helps your AI remember what matters, find trustworthy answers, and learn
 as you use it.
 
-This private repository contains the early development of Mosaic: a multimodal knowledge
-and memory platform for people and AI agents.
+This repository contains the early development of Mosaic: a multimodal knowledge and
+memory platform for people and AI agents.
 
 The goal is to turn local files, connected data sources, conversations, and agent work
 into a living, evidence-backed knowledge base. Users should be able to ask questions,
@@ -142,9 +142,9 @@ docs                      Product, architecture, data model, and delivery plans
 
 The platform architecture, evidence model, deployment strategy, milestones, and GitHub
 issue structure are defined. The repository contains a functional Next.js knowledge
-workspace, initial Python services and packages, Docker scaffolding, and CI. Shared
-platform contracts, the DeepAgents adapter, tool integration, and a minimal
-knowledge-chat path are implemented.
+workspace, initial Python services and packages, Docker scaffolding, CI, and the first
+PostgreSQL schema. Shared platform contracts, the DeepAgents adapter, tool integration,
+and a minimal knowledge-chat path are implemented.
 
 ## Local Development
 
@@ -160,6 +160,8 @@ Run the Python checks:
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
+docker compose up -d postgres
+alembic upgrade head
 pytest
 ```
 
@@ -181,5 +183,5 @@ cp .env.example .env
 docker compose up --build
 ```
 
-The database schema, durable queue, storage integration, and API-backed frontend flows
-will be added in the next runtime milestones.
+The durable queue, storage integration, and API-backed frontend flows will be added in
+the next runtime milestones.
