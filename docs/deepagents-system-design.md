@@ -2,9 +2,12 @@
 
 ## Purpose
 
-This document maps DeepAgents SDK capabilities to the deep research product. The goal is
-to use the SDK as the agent harness rather than rebuilding planning, tool execution,
-filesystem, subagents, interrupts, memory, or streaming.
+This document maps DeepAgents SDK capabilities to the agentic knowledge and memory
+platform. The goal is to use the SDK as the agent harness rather than rebuilding
+planning, tool execution, filesystem, subagents, interrupts, memory, or streaming.
+
+Deep research, chat/Q&A, report generation, source ingestion, source deepening, and
+memory extraction should all run through the same harness boundary.
 
 ## SDK Capabilities We Should Use
 
@@ -25,15 +28,16 @@ DeepAgents provides:
 
 ## Product Boundary
 
-DeepAgents owns agent execution. Our product owns research semantics.
+DeepAgents owns agent execution. Our product owns knowledge, memory, source provenance,
+and application semantics.
 
 ```text
 API / Worker
-  -> ResearchTask
+  -> AgentTask
   -> HarnessAdapter
   -> DeepAgents agent
   -> DeepAgents stream / interrupts / files / memory
-  -> Product ResearchEvent stream
+  -> ProductEvent stream
   -> API persistence + WebSocket frontend
 ```
 
@@ -42,9 +46,10 @@ Everything becomes a product contract first.
 
 ## Product Persistence And Sessions
 
-The product needs durable user, project, knowledge-scope, conversation, asset, event, and
-graph state outside of DeepAgents. DeepAgents should be resumable through product-owned
-IDs, but it should not be the only source of truth for user-visible history.
+The product needs durable user, project, knowledge-scope, conversation, asset, connector,
+memory, event, and graph state outside of DeepAgents. DeepAgents should be resumable
+through product-owned IDs, but it should not be the only source of truth for user-visible
+history.
 
 Postgres is the V1 system of record:
 
@@ -56,10 +61,15 @@ project_memberships
 knowledge_scopes
 conversations
 messages
+agent_tasks
 research_runs
-research_events
+product_events
 intervention_requests
 deepagents_threads
+memory_records
+memory_links
+source_connectors
+source_sync_runs
 assets
 knowledge_files
 graph_nodes
@@ -72,6 +82,7 @@ Object storage owns file bytes:
 
 ```text
 uploaded PDFs/docs/images
+connector snapshots from Slack/GitHub/Drive/Notion/web
 fetched web source snapshots
 generated reports
 charts/images/slides
@@ -85,12 +96,13 @@ DeepAgents thread and checkpoint state should be keyed by product IDs:
 
 ```text
 conversation_id -> default DeepAgents thread_id
-research_run_id -> run-specific DeepAgents thread_id
+agent_task_id -> task-specific DeepAgents thread_id when isolation is useful
+research_run_id -> research-specific child thread_id
 intervention_request_id -> interrupt/resume correlation
 ```
 
-This lets the product resume conversations, continue interrupted research runs, and
-rebuild the visible timeline even if a worker restarts.
+This lets the product resume conversations, continue interrupted agent work, and rebuild
+the visible timeline even if a worker restarts.
 
 ## Context Pack Assembly
 
@@ -99,13 +111,14 @@ persisted product state:
 
 1. conversation summary
 2. recent messages
-3. active research run state
+3. active agent task or application state
 4. pending interventions
-5. relevant project and knowledge-scope metadata
-6. graph-guided retrieval result sets
-7. selected source/code cards and topic files
-8. asset metadata and accessible workspace paths
-9. DeepAgents thread/checkpoint ID
+5. relevant memory records and memory links
+6. relevant project and knowledge-scope metadata
+7. graph-guided retrieval result sets
+8. selected source/code cards and topic files
+9. connector and asset metadata plus accessible workspace paths
+10. DeepAgents thread/checkpoint ID
 
 The context pack is the bridge between session persistence and agent execution. It keeps
 inputs bounded while still grounding the agent in prior work.
@@ -118,8 +131,8 @@ Context assembly should be deterministic enough to audit:
 - avoid loading raw assets unless the graph/source card indicates the agent should inspect
   them
 
-DeepAgents owns internal execution state; the product owns the recoverable context recipe
-and user-visible timeline.
+DeepAgents owns internal execution state; the product owns the recoverable context recipe,
+memory projection, knowledge projection, and user-visible timeline.
 
 ## Filesystem And Backend Strategy
 
@@ -188,12 +201,18 @@ The knowledge system should combine agent-readable files with a graph/index proj
 The graph is not expected to decide whether evidence is relevant. It should return
 structured results that describe what the system currently knows. The agent evaluates
 those results and decides whether to answer, search again, or deepen original sources.
+The canonical graph is evidence-first: extraction agents write candidates, not trusted
+facts, and every promoted semantic record remains connected to exact source evidence.
+See [knowledge-graph-design.md](knowledge-graph-design.md) for the canonical lifecycle,
+identity, validation, temporal, and retrieval contracts.
 
 ```text
 Raw source or repository
   -> shallow source/code card
-  -> central research map
-  -> graph nodes and edges
+  -> structured source chunks
+  -> extraction candidates
+  -> validation and entity resolution
+  -> canonical source-relative graph
   -> graph-guided retrieval results
   -> agent evaluation
   -> targeted deepening when needed
@@ -228,6 +247,15 @@ The graph response should be mechanical and provenance-rich:
 The graph should avoid language such as "likely relevant" or "probably contains." It
 returns known nodes, edges, file paths, chunks, page ranges, and source references. The
 agent decides relevance and sufficiency.
+
+Similarity, retrieval score, and extraction confidence must remain distinct:
+
+- similarity estimates whether two representations are close
+- retrieval score ranks a result for a query
+- extraction confidence records uncertainty in an extraction process
+- evidence status records whether a source range supports or contradicts a claim
+
+Only the last of these can justify a citation.
 
 ### Progressive Ingestion
 
@@ -290,6 +318,7 @@ Source -> HAS_CHUNK -> Chunk
 Chunk -> SUPPORTS -> Claim
 Claim -> ABOUT -> Topic
 Claim -> CONTRADICTS -> Claim
+Claim -> SUPERSEDES -> Claim
 Repository -> HAS_FILE -> CodeFile
 CodeFile -> DEFINES -> Symbol
 Symbol -> DEPENDS_ON -> Symbol
@@ -453,14 +482,19 @@ events should store the durable user-visible projection, not every internal toke
 V1 can implement the graph repository in Postgres tables first:
 
 ```text
-graph_nodes(id, type, title, file_path, artifact_path, metadata)
-graph_edges(id, from_node_id, relation, to_node_id, confidence, metadata)
-graph_chunks(id, node_id, source_range, text_ref, metadata)
-ingestion_runs(id, target_node_id, mode, coverage, status, metadata)
+graph_schema_versions
+graph_nodes / graph_edges / graph_chunks
+graph_candidates / graph_candidate_evidence
+graph_entity_aliases / graph_entity_merges
+graph_embeddings
+graph_retrieval_runs
+ingestion_runs
 ```
 
 Neo4j can be added later as a projection if multi-hop relationship queries outgrow the
-Postgres graph repository. The adapter should keep the agent-facing graph tools stable.
+Postgres graph repository. Full-text, vector, and Neo4j records are rebuildable
+projections keyed by canonical Postgres UUIDs. The adapter should keep the agent-facing
+graph tools stable.
 
 ## Subagent Design
 
@@ -559,13 +593,18 @@ in trace metadata for debugging.
 7. Add backend factory with local `CompositeBackend`.
 8. Add permission policy and HITL resume flow.
 9. Add upload/artifact seeding and retrieval.
-10. Add file-native graph repository and progressive ingestion states.
-11. Add graph-guided retrieval tools that return source/code result sets.
-12. Add Search as Code runner with bounded sandbox execution.
-13. Add codebase research ingestion/search/citation tools.
-14. Add subagent roster and event mapping.
-15. Add skills directory and read-only skills route.
-16. Add durable checkpointer/store integration.
+10. Add structured source ranges and the canonical Postgres graph repository.
+11. Add versioned graph schemas plus extraction candidate validation and promotion.
+12. Add entity aliases, deterministic identity, and reversible merge decisions.
+13. Add chunk full-text/vector projections and projection version tracking.
+14. Add a retrieval router and auditable result-set contract.
+15. Add bounded graph traversal only for evaluated relationship and multi-hop queries.
+16. Add ingestion, graph, retrieval, and citation evaluation fixtures.
+17. Add Search as Code runner with bounded sandbox execution.
+18. Add codebase research ingestion/search/citation tools.
+19. Add subagent roster and event mapping.
+20. Add skills directory and read-only skills route.
+21. Add durable checkpointer/store integration.
 
 ## Key Open Questions
 
@@ -583,6 +622,10 @@ in trace metadata for debugging.
 - What budget limits should apply to generated search programs?
 - Should the initial graph repository be Postgres-only, or should Neo4j be available as
   an optional projection from day one?
+- Which graph candidate types can be promoted automatically, and which require review?
+- Which query classes show enough measured gain from graph traversal to enable it by
+  default?
+- Which domain identifiers are strong enough for deterministic entity resolution in V1?
 - What minimum shallow card fields are required before a source is useful for graph
   retrieval?
 - Should conversation-level and research-run-level DeepAgents threads be separate from
