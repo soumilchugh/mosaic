@@ -24,6 +24,7 @@ dev = [
 [tool.hatch.build.targets.wheel]
 packages = [
   "packages/harness_core/src/harness_core",
+  "packages/knowledge_core/src/knowledge_core",
   "packages/research_core/src/research_core",
   "services/api/src/api",
   "services/worker/src/worker",
@@ -32,12 +33,14 @@ packages = [
 [tool.pytest.ini_options]
 testpaths = [
   "packages/harness_core/tests",
+  "packages/knowledge_core/tests",
   "packages/research_core/tests",
   "services/api/tests",
   "services/worker/tests",
 ]
 pythonpath = [
   "packages/harness_core/src",
+  "packages/knowledge_core/src",
   "packages/research_core/src",
   "services/api/src",
   "services/worker/src",

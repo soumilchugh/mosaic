@@ -1,0 +1,43 @@
+"""Shared contracts for the knowledge and memory platform."""
+
+from knowledge_core.contracts import (
+    AgentTask,
+    AgentTaskStatus,
+    AgentTaskType,
+    Asset,
+    AssetKind,
+    Conversation,
+    ConversationStatus,
+    KnowledgeFile,
+    KnowledgeFileStatus,
+    KnowledgeFileType,
+    KnowledgeScope,
+    KnowledgeScopeType,
+    KnowledgeScopeVisibility,
+    Message,
+    MessageRole,
+    ProductEvent,
+    Project,
+    ProjectStatus,
+)
+
+__all__ = [
+    "AgentTask",
+    "AgentTaskStatus",
+    "AgentTaskType",
+    "Asset",
+    "AssetKind",
+    "Conversation",
+    "ConversationStatus",
+    "KnowledgeFile",
+    "KnowledgeFileStatus",
+    "KnowledgeFileType",
+    "KnowledgeScope",
+    "KnowledgeScopeType",
+    "KnowledgeScopeVisibility",
+    "Message",
+    "MessageRole",
+    "ProductEvent",
+    "Project",
+    "ProjectStatus",
+]
