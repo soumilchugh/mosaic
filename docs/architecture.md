@@ -210,7 +210,9 @@ GET  /knowledge-scopes/{knowledge_scope_id}
 POST /conversations
 GET  /conversations/{conversation_id}
 POST /conversations/{conversation_id}/messages
-POST /assets
+POST /projects/{project_id}/assets
+GET  /projects/{project_id}/assets/{asset_id}
+GET  /projects/{project_id}/assets/{asset_id}/content
 POST /ingestion-runs
 POST /source-connectors
 GET  /source-connectors/{connector_id}

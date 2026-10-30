@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from enum import StrEnum
 from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 from pydantic import SecretStr, model_validator
@@ -84,6 +85,7 @@ class MosaicSettings(BaseSettings):
     search_api_key: SecretStr | None = None
 
     storage_provider: StorageProvider = StorageProvider.FILESYSTEM
+    storage_root: Path = Path(".mosaic/objects")
     storage_endpoint: str | None = None
     storage_bucket: str = "mosaic"
     storage_access_key: SecretStr | None = None

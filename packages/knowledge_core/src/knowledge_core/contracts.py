@@ -82,6 +82,13 @@ class AssetKind(StrEnum):
     EXPORT = "export"
 
 
+class AssetStatus(StrEnum):
+    AVAILABLE = "available"
+    PROCESSING = "processing"
+    FAILED = "failed"
+    DELETED = "deleted"
+
+
 class KnowledgeFileType(StrEnum):
     SOURCE_CARD = "source_card"
     TOPIC_CARD = "topic_card"
@@ -221,7 +228,7 @@ class Asset(ContractModel):
     agent_task_id: UUID | None = None
     created_by_user_id: UUID | None = None
     source_metadata: dict[str, Any] = Field(default_factory=dict)
-    status: str = "available"
+    status: AssetStatus = AssetStatus.AVAILABLE
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
