@@ -23,6 +23,11 @@ services:
     command: uvicorn api.main:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
+    environment:
+      MOSAIC_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-mosaic}:${POSTGRES_PASSWORD:-mosaic}@postgres:5432/${POSTGRES_DB:-mosaic}
+      MOSAIC_STORAGE_ROOT: /var/lib/mosaic/objects
+    volumes:
+      - object-data:/var/lib/mosaic/objects
     depends_on:
       postgres:
         condition: service_healthy
@@ -43,6 +48,11 @@ services:
       context: .
       dockerfile: services/worker/Dockerfile
     command: python -m worker.main
+    environment:
+      MOSAIC_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-mosaic}:${POSTGRES_PASSWORD:-mosaic}@postgres:5432/${POSTGRES_DB:-mosaic}
+      MOSAIC_STORAGE_ROOT: /var/lib/mosaic/objects
+    volumes:
+      - object-data:/var/lib/mosaic/objects
     depends_on:
       postgres:
         condition: service_healthy
@@ -65,3 +75,4 @@ services:
 
 volumes:
   postgres-data:
+  object-data:

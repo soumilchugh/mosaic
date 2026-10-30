@@ -195,6 +195,13 @@ Uploaded assets should flow through the product, not directly through an LLM too
 For sandbox-backed runs, use DeepAgents sandbox backend transfer APIs to seed files before
 execution and retrieve generated artifacts after execution.
 
+The first local implementation uses the provider-neutral filesystem object-store adapter.
+It writes bucket-style `object://` URIs and mounts one durable object volume into both the
+API and worker containers. Production S3, MinIO, or Supabase adapters implement the same
+storage contract. Workers materialize selected records under `/workspace/uploads/`; files
+written under `/artifacts/` return through the same service and create an
+`artifact.generated` product event.
+
 ## Live Knowledge Workspace And Graph
 
 The knowledge system should combine agent-readable files with a graph/index projection.

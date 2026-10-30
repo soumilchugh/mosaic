@@ -6,8 +6,12 @@ from knowledge_core import (
     ProviderRegistry,
     TaskQueue,
     get_settings,
+    register_database_providers,
+    register_storage_providers,
     register_task_queue_providers,
 )
+
+from api.assets import router as assets_router
 
 
 def create_app(
@@ -19,8 +23,11 @@ def create_app(
     app = FastAPI(title="Mosaic API")
     app.state.settings = settings
     app.state.provider_registry = provider_registry or ProviderRegistry(settings)
+    register_database_providers(app.state.provider_registry)
+    register_storage_providers(app.state.provider_registry)
     register_task_queue_providers(app.state.provider_registry)
     app.state.harness_adapter = harness_adapter or FakeHarnessAdapter()
+    app.include_router(assets_router)
     return app
 
 
