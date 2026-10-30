@@ -1,5 +1,20 @@
 """Shared contracts for the knowledge and memory platform."""
 
+from knowledge_core.config import (
+    DatabaseProvider,
+    Environment,
+    ModelProvider,
+    MosaicSettings,
+    ProviderAlreadyRegisteredError,
+    ProviderKind,
+    ProviderNotRegisteredError,
+    ProviderRegistry,
+    QueueProvider,
+    SandboxProvider,
+    SearchProvider,
+    StorageProvider,
+    get_settings,
+)
 from knowledge_core.contracts import (
     AgentTask,
     AgentTaskStatus,
@@ -37,6 +52,8 @@ __all__ = [
     "AssetKind",
     "Conversation",
     "ConversationStatus",
+    "DatabaseProvider",
+    "Environment",
     "GraphChunk",
     "GraphEdge",
     "GraphNode",
@@ -53,7 +70,18 @@ __all__ = [
     "Message",
     "MessageContentFormat",
     "MessageRole",
+    "ModelProvider",
+    "MosaicSettings",
     "ProductEvent",
+    "ProviderAlreadyRegisteredError",
+    "ProviderKind",
+    "ProviderNotRegisteredError",
+    "ProviderRegistry",
     "Project",
     "ProjectStatus",
+    "QueueProvider",
+    "SandboxProvider",
+    "SearchProvider",
+    "StorageProvider",
+    "get_settings",
 ]

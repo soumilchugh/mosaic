@@ -165,6 +165,11 @@ alembic upgrade head
 pytest
 ```
 
+Application settings use `MOSAIC_` environment variables. Start from `.env.example` and
+select database, model, search, storage, queue, and sandbox providers there. Local
+defaults do not require cloud credentials; provider secrets should only be placed in the
+untracked `.env` file or a deployment secret manager.
+
 Run the web workspace:
 
 ```bash
