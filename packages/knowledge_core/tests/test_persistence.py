@@ -31,6 +31,7 @@ CORE_TABLES = {
     "graph_nodes",
     "graph_schema_versions",
     "ingestion_runs",
+    "intervention_requests",
     "knowledge_files",
     "knowledge_scopes",
     "messages",
@@ -38,6 +39,7 @@ CORE_TABLES = {
     "product_events",
     "project_memberships",
     "projects",
+    "research_runs",
     "users",
 }
 

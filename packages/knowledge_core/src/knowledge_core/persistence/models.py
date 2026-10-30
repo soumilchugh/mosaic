@@ -204,6 +204,9 @@ class MessageRecord(Base):
     )
     sequence: Mapped[int] = mapped_column(BigInteger, nullable=False)
     user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    research_run_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("research_runs.id", ondelete="SET NULL")
+    )
     metadata_json: Mapped[dict[str, Any]] = json_column()
     created_at: Mapped[datetime] = created_at_column()
 
@@ -244,6 +247,49 @@ class AgentTaskRecord(Base):
     updated_at: Mapped[datetime] = updated_at_column()
 
 
+class ResearchRunRecord(Base):
+    __tablename__ = "research_runs"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('created', 'planning', 'awaiting_intervention', 'researching', "
+            "'writing', 'editing', 'completed', 'failed', 'cancelled')",
+            name="status",
+        ),
+        CheckConstraint("depth IN ('quick', 'standard', 'deep')", name="depth"),
+        CheckConstraint(
+            "strategy IN ('breadth_first', 'depth_first', 'hybrid')", name="strategy"
+        ),
+        CheckConstraint(
+            "output_format IN ('markdown', 'report', 'deck_later')", name="output_format"
+        ),
+        UniqueConstraint("agent_task_id"),
+    )
+
+    id: Mapped[UUID] = uuid_column()
+    project_id: Mapped[UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    conversation_id: Mapped[UUID] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    agent_task_id: Mapped[UUID] = mapped_column(
+        ForeignKey("agent_tasks.id", ondelete="CASCADE"), nullable=False
+    )
+    created_by_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    intent: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, server_default="created")
+    depth: Mapped[str] = mapped_column(String(30), nullable=False, server_default="standard")
+    strategy: Mapped[str] = mapped_column(String(30), nullable=False, server_default="hybrid")
+    output_format: Mapped[str] = mapped_column(String(30), nullable=False, server_default="report")
+    settings: Mapped[dict[str, Any]] = json_column()
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = created_at_column()
+    updated_at: Mapped[datetime] = updated_at_column()
+
+
 class ProductEventRecord(Base):
     __tablename__ = "product_events"
     __table_args__ = (
@@ -261,6 +307,9 @@ class ProductEventRecord(Base):
     agent_task_id: Mapped[UUID] = mapped_column(
         ForeignKey("agent_tasks.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    research_run_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("research_runs.id", ondelete="SET NULL")
+    )
     sequence: Mapped[int] = mapped_column(BigInteger, nullable=False)
     type: Mapped[str] = mapped_column(String(200), nullable=False)
     payload: Mapped[dict[str, Any]] = json_column()
@@ -273,7 +322,23 @@ class DeepAgentsThreadRecord(Base):
     __tablename__ = "deepagents_threads"
     __table_args__ = (
         CheckConstraint("status IN ('active', 'paused', 'completed', 'failed')", name="status"),
-        CheckConstraint("conversation_id IS NOT NULL OR agent_task_id IS NOT NULL", name="owner"),
+        CheckConstraint(
+            "conversation_id IS NOT NULL OR agent_task_id IS NOT NULL "
+            "OR research_run_id IS NOT NULL",
+            name="owner",
+        ),
+        Index(
+            "uq_deepagents_threads_conversation_default",
+            "conversation_id",
+            unique=True,
+            postgresql_where=text("agent_task_id IS NULL AND research_run_id IS NULL"),
+        ),
+        Index(
+            "uq_deepagents_threads_research_run",
+            "research_run_id",
+            unique=True,
+            postgresql_where=text("research_run_id IS NOT NULL"),
+        ),
     )
 
     id: Mapped[UUID] = uuid_column()
@@ -286,12 +351,59 @@ class DeepAgentsThreadRecord(Base):
     agent_task_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("agent_tasks.id", ondelete="CASCADE")
     )
+    research_run_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("research_runs.id", ondelete="CASCADE")
+    )
     thread_id: Mapped[str] = mapped_column(String(300), nullable=False, unique=True)
     checkpoint_namespace: Mapped[str | None] = mapped_column(String(300))
     status: Mapped[str] = mapped_column(String(30), nullable=False, server_default="active")
     metadata_json: Mapped[dict[str, Any]] = json_column()
     created_at: Mapped[datetime] = created_at_column()
     updated_at: Mapped[datetime] = updated_at_column()
+
+
+class InterventionRequestRecord(Base):
+    __tablename__ = "intervention_requests"
+    __table_args__ = (
+        CheckConstraint(
+            "type IN ('topic_approval', 'tool_approval', 'memory_write', "
+            "'filesystem_write', 'export_approval')",
+            name="type",
+        ),
+        CheckConstraint(
+            "status IN ('pending', 'approved', 'edited', 'rejected', 'expired', 'resolved')",
+            name="status",
+        ),
+        CheckConstraint("agent_task_id IS NOT NULL OR research_run_id IS NOT NULL", name="owner"),
+        UniqueConstraint("deepagents_thread_id", "checkpoint_id"),
+    )
+
+    id: Mapped[UUID] = uuid_column()
+    project_id: Mapped[UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    conversation_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE")
+    )
+    agent_task_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("agent_tasks.id", ondelete="CASCADE")
+    )
+    research_run_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("research_runs.id", ondelete="CASCADE")
+    )
+    deepagents_thread_id: Mapped[UUID] = mapped_column(
+        ForeignKey("deepagents_threads.id", ondelete="CASCADE"), nullable=False
+    )
+    checkpoint_id: Mapped[str] = mapped_column(String(500), nullable=False)
+    type: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, server_default="pending")
+    request_payload: Mapped[dict[str, Any]] = json_column()
+    response_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    requested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class AssetRecord(Base):

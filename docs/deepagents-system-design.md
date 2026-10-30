@@ -104,6 +104,18 @@ intervention_request_id -> interrupt/resume correlation
 This lets the product resume conversations, continue interrupted agent work, and rebuild
 the visible timeline even if a worker restarts.
 
+V1 uses deterministic IDs at the harness boundary:
+
+```text
+conversation:{conversation_id} -> checkpoint namespace knowledge_chat
+research:{research_run_id}     -> checkpoint namespace deep_research
+```
+
+The product stores the LangGraph `checkpoint_id` on the intervention request. A restarted
+worker loads the intervention, task, and `deepagents_threads` record, then rebuilds the
+resume request without relying on process memory. User messages and their task/thread
+mapping are committed before the worker is allowed to invoke DeepAgents.
+
 ## Context Pack Assembly
 
 Before each DeepAgents invocation, the worker should assemble a bounded context pack from

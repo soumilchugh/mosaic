@@ -6,38 +6,44 @@ from typing import Any, Generic, Protocol, TypeVar
 from uuid import UUID
 
 from pydantic import BaseModel
-from sqlalchemy import exists, or_, select
+from sqlalchemy import exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from knowledge_core.contracts import (
     AgentTask,
     Asset,
     Conversation,
+    DeepAgentsThread,
     GraphChunk,
     GraphEdge,
     GraphNode,
     GraphSchemaVersion,
     IngestionRun,
+    InterventionRequest,
     KnowledgeFile,
     Message,
     ProductEvent,
     Project,
+    ResearchRun,
 )
 from knowledge_core.persistence.models import (
     AgentTaskRecord,
     AssetRecord,
     ConversationRecord,
+    DeepAgentsThreadRecord,
     GraphChunkRecord,
     GraphEdgeRecord,
     GraphNodeRecord,
     GraphSchemaVersionRecord,
     IngestionRunRecord,
+    InterventionRequestRecord,
     KnowledgeFileRecord,
     KnowledgeScopeRecord,
     MessageRecord,
     ProductEventRecord,
     ProjectMembershipRecord,
     ProjectRecord,
+    ResearchRunRecord,
 )
 
 ContractT = TypeVar("ContractT", bound=BaseModel)
@@ -80,11 +86,18 @@ class EntityRepository(Protocol[ContractT]):
     def update(self, entity: ContractT) -> ContractT: ...
 
 
+class MessageRepository(EntityRepository[Message], Protocol):
+    def next_sequence(self, conversation_id: UUID) -> int: ...
+
+
 class PlatformRepositories(Protocol):
     projects: EntityRepository[Project]
     conversations: EntityRepository[Conversation]
-    messages: EntityRepository[Message]
+    messages: MessageRepository
     tasks: EntityRepository[AgentTask]
+    research_runs: EntityRepository[ResearchRun]
+    deepagents_threads: EntityRepository[DeepAgentsThread]
+    interventions: EntityRepository[InterventionRequest]
     events: EntityRepository[ProductEvent]
     assets: EntityRepository[Asset]
     knowledge_files: EntityRepository[KnowledgeFile]
@@ -161,7 +174,7 @@ MESSAGE_SPEC = _RepositorySpec(
     Message,
     MessageRecord,
     tuple(Message.model_fields),
-    ("role", "content", "content_format", "user_id", "metadata"),
+    ("role", "content", "content_format", "user_id", "research_run_id", "metadata"),
     {"metadata": "metadata_json"},
 )
 
@@ -185,8 +198,39 @@ TASK_SPEC = _RepositorySpec(
 EVENT_SPEC = _RepositorySpec(
     ProductEvent,
     ProductEventRecord,
-    tuple(name for name in ProductEvent.model_fields if name != "research_run_id"),
+    tuple(ProductEvent.model_fields),
     ("type", "payload", "source_event_id", "trace_id"),
+)
+
+RESEARCH_RUN_SPEC = _RepositorySpec(
+    ResearchRun,
+    ResearchRunRecord,
+    tuple(ResearchRun.model_fields),
+    (
+        "status",
+        "depth",
+        "strategy",
+        "output_format",
+        "settings",
+        "started_at",
+        "completed_at",
+        "updated_at",
+    ),
+)
+
+DEEPAGENTS_THREAD_SPEC = _RepositorySpec(
+    DeepAgentsThread,
+    DeepAgentsThreadRecord,
+    tuple(DeepAgentsThread.model_fields),
+    ("checkpoint_namespace", "status", "metadata", "updated_at"),
+    {"metadata": "metadata_json"},
+)
+
+INTERVENTION_SPEC = _RepositorySpec(
+    InterventionRequest,
+    InterventionRequestRecord,
+    tuple(InterventionRequest.model_fields),
+    ("status", "response_payload", "responded_at", "expires_at"),
 )
 
 ASSET_SPEC = _RepositorySpec(
@@ -372,7 +416,10 @@ class _SqlAlchemyScopedRepository(Generic[ContractT, RecordT]):
 
     def list(self) -> list[ContractT]:
         record_type = self._spec.record_type
-        query = self._query().order_by(record_type.created_at, record_type.id)
+        order_field = getattr(
+            record_type, "created_at", getattr(record_type, "requested_at", record_type.id)
+        )
+        query = self._query().order_by(order_field, record_type.id)
         return [self._spec.contract(record) for record in self._session.scalars(query)]
 
     def update(self, entity: ContractT) -> ContractT:
@@ -399,9 +446,29 @@ class _SqlAlchemyMessageRepository(_SqlAlchemyScopedRepository[Message, MessageR
         )
         if conversation_id is None:
             raise ProjectBoundaryError("message conversation is outside the repository project")
+        if entity.research_run_id is not None:
+            research_run_id = self._session.scalar(
+                select(ResearchRunRecord.id).where(
+                    ResearchRunRecord.id == entity.research_run_id,
+                    ResearchRunRecord.project_id == self._context.project_id,
+                    ResearchRunRecord.conversation_id == entity.conversation_id,
+                )
+            )
+            if research_run_id is None:
+                raise ProjectBoundaryError("message research run is outside its conversation")
 
     def _validate(self, entity: Message) -> None:
         self._validate_conversation(entity)
+
+    def update(self, entity: Message) -> Message:
+        self._validate(entity)
+        record = self._session.get(MessageRecord, entity.id)
+        if record is None or record.conversation_id != entity.conversation_id:
+            raise EntityNotFoundError(f"messages {entity.id} was not found")
+        for name in MESSAGE_SPEC.update_fields:
+            setattr(record, MESSAGE_SPEC.record_name(name), getattr(entity, name))
+        self._session.flush()
+        return MESSAGE_SPEC.contract(record)
 
     def _query(self) -> Any:
         return (
@@ -409,6 +476,24 @@ class _SqlAlchemyMessageRepository(_SqlAlchemyScopedRepository[Message, MessageR
             .join(ConversationRecord, ConversationRecord.id == MessageRecord.conversation_id)
             .where(ConversationRecord.project_id == self._context.project_id)
         )
+
+    def next_sequence(self, conversation_id: UUID) -> int:
+        conversation = self._session.scalar(
+            select(ConversationRecord.id)
+            .where(
+                ConversationRecord.id == conversation_id,
+                ConversationRecord.project_id == self._context.project_id,
+            )
+            .with_for_update()
+        )
+        if conversation is None:
+            raise ProjectBoundaryError("message conversation is outside the repository project")
+        current = self._session.scalar(
+            select(func.max(MessageRecord.sequence)).where(
+                MessageRecord.conversation_id == conversation_id
+            )
+        )
+        return 0 if current is None else current + 1
 
 
 class _SqlAlchemyGraphSchemaRepository:
@@ -456,6 +541,15 @@ class SqlAlchemyRepositories:
         self.conversations = _SqlAlchemyScopedRepository(session, context, CONVERSATION_SPEC)
         self.messages = _SqlAlchemyMessageRepository(session, context)
         self.tasks = _SqlAlchemyScopedRepository(session, context, TASK_SPEC, self._validate_task)
+        self.research_runs = _SqlAlchemyScopedRepository(
+            session, context, RESEARCH_RUN_SPEC, self._validate_research_run
+        )
+        self.deepagents_threads = _SqlAlchemyScopedRepository(
+            session, context, DEEPAGENTS_THREAD_SPEC, self._validate_thread
+        )
+        self.interventions = _SqlAlchemyScopedRepository(
+            session, context, INTERVENTION_SPEC, self._validate_intervention
+        )
         self.events = _SqlAlchemyScopedRepository(
             session, context, EVENT_SPEC, self._validate_event
         )
@@ -514,10 +608,36 @@ class SqlAlchemyRepositories:
         self._validate_reference(ConversationRecord, entity.conversation_id, "task conversation")
 
     def _validate_event(self, entity: ProductEvent) -> None:
-        if entity.research_run_id is not None:
-            raise RepositoryError("research-run events are not persisted in the V1 schema yet")
         self._validate_reference(AgentTaskRecord, entity.agent_task_id, "event task")
         self._validate_reference(ConversationRecord, entity.conversation_id, "event conversation")
+        self._validate_reference(ResearchRunRecord, entity.research_run_id, "event research run")
+
+    def _validate_research_run(self, entity: ResearchRun) -> None:
+        self._validate_reference(
+            ConversationRecord, entity.conversation_id, "research run conversation"
+        )
+        self._validate_reference(AgentTaskRecord, entity.agent_task_id, "research run task")
+
+    def _validate_thread(self, entity: DeepAgentsThread) -> None:
+        self._validate_reference(
+            ConversationRecord, entity.conversation_id, "thread conversation"
+        )
+        self._validate_reference(AgentTaskRecord, entity.agent_task_id, "thread task")
+        self._validate_reference(ResearchRunRecord, entity.research_run_id, "thread research run")
+
+    def _validate_intervention(self, entity: InterventionRequest) -> None:
+        self._validate_reference(
+            ConversationRecord, entity.conversation_id, "intervention conversation"
+        )
+        self._validate_reference(AgentTaskRecord, entity.agent_task_id, "intervention task")
+        self._validate_reference(
+            ResearchRunRecord, entity.research_run_id, "intervention research run"
+        )
+        self._validate_reference(
+            DeepAgentsThreadRecord,
+            entity.deepagents_thread_id,
+            "intervention DeepAgents thread",
+        )
 
     def _validate_asset(self, entity: Asset) -> None:
         self._validate_knowledge_scope(entity)
@@ -663,7 +783,13 @@ class _InMemoryScopedRepository(Generic[ContractT]):
         ]
         return [
             entity.model_copy(deep=True)
-            for entity in sorted(entities, key=lambda e: (e.created_at, e.id))
+            for entity in sorted(
+                entities,
+                key=lambda e: (
+                    getattr(e, "created_at", None) or e.requested_at,
+                    e.id,
+                ),
+            )
         ]
 
     def update(self, entity: ContractT) -> ContractT:
@@ -679,6 +805,10 @@ class _InMemoryMessageRepository(_InMemoryScopedRepository[Message]):
         conversation = conversations.get(entity.conversation_id)
         if conversation is None or conversation.project_id != self._context.project_id:
             raise ProjectBoundaryError("message conversation is outside the repository project")
+        if entity.research_run_id is not None:
+            research_run = self._store.entities.get(ResearchRun, {}).get(entity.research_run_id)
+            if research_run is None or research_run.conversation_id != entity.conversation_id:
+                raise ProjectBoundaryError("message research run is outside its conversation")
 
     def get(self, entity_id: UUID) -> Message:
         entity = self._entities.get(entity_id)
@@ -695,7 +825,21 @@ class _InMemoryMessageRepository(_InMemoryScopedRepository[Message]):
             except ProjectBoundaryError:
                 continue
             entities.append(entity)
-        return [entity.model_copy(deep=True) for entity in sorted(entities, key=lambda e: e.id)]
+        return [
+            entity.model_copy(deep=True)
+            for entity in sorted(entities, key=lambda e: (e.sequence, e.id))
+        ]
+
+    def next_sequence(self, conversation_id: UUID) -> int:
+        conversation = self._store.entities.get(Conversation, {}).get(conversation_id)
+        if conversation is None or conversation.project_id != self._context.project_id:
+            raise ProjectBoundaryError("message conversation is outside the repository project")
+        sequences = [
+            message.sequence
+            for message in self._entities.values()
+            if message.conversation_id == conversation_id
+        ]
+        return max(sequences, default=-1) + 1
 
 
 class _InMemoryGraphSchemaRepository(_InMemoryScopedRepository[GraphSchemaVersion]):
@@ -737,6 +881,15 @@ class InMemoryRepositories:
         self.conversations = _InMemoryScopedRepository(store, context, Conversation)
         self.messages = _InMemoryMessageRepository(store, context, Message)
         self.tasks = _InMemoryScopedRepository(store, context, AgentTask, self._validate_task)
+        self.research_runs = _InMemoryScopedRepository(
+            store, context, ResearchRun, self._validate_research_run
+        )
+        self.deepagents_threads = _InMemoryScopedRepository(
+            store, context, DeepAgentsThread, self._validate_thread
+        )
+        self.interventions = _InMemoryScopedRepository(
+            store, context, InterventionRequest, self._validate_intervention
+        )
         self.events = _InMemoryScopedRepository(store, context, ProductEvent, self._validate_event)
         self.assets = _InMemoryScopedRepository(store, context, Asset, self._validate_asset)
         self.knowledge_files = _InMemoryScopedRepository(
@@ -769,10 +922,30 @@ class InMemoryRepositories:
         self._validate_reference(Conversation, entity.conversation_id, "task conversation")
 
     def _validate_event(self, entity: ProductEvent) -> None:
-        if entity.research_run_id is not None:
-            raise RepositoryError("research-run events are not persisted in the V1 schema yet")
         self._validate_reference(AgentTask, entity.agent_task_id, "event task")
         self._validate_reference(Conversation, entity.conversation_id, "event conversation")
+        self._validate_reference(ResearchRun, entity.research_run_id, "event research run")
+
+    def _validate_research_run(self, entity: ResearchRun) -> None:
+        self._validate_reference(Conversation, entity.conversation_id, "research run conversation")
+        self._validate_reference(AgentTask, entity.agent_task_id, "research run task")
+
+    def _validate_thread(self, entity: DeepAgentsThread) -> None:
+        self._validate_reference(Conversation, entity.conversation_id, "thread conversation")
+        self._validate_reference(AgentTask, entity.agent_task_id, "thread task")
+        self._validate_reference(ResearchRun, entity.research_run_id, "thread research run")
+
+    def _validate_intervention(self, entity: InterventionRequest) -> None:
+        self._validate_reference(
+            Conversation, entity.conversation_id, "intervention conversation"
+        )
+        self._validate_reference(AgentTask, entity.agent_task_id, "intervention task")
+        self._validate_reference(
+            ResearchRun, entity.research_run_id, "intervention research run"
+        )
+        self._validate_reference(
+            DeepAgentsThread, entity.deepagents_thread_id, "intervention DeepAgents thread"
+        )
 
     def _validate_asset(self, entity: Asset) -> None:
         self._validate_knowledge_scope(entity)

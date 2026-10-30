@@ -298,6 +298,7 @@ Important fields:
 id uuid primary key
 project_id uuid references projects(id)
 conversation_id uuid references conversations(id) null
+agent_task_id uuid references agent_tasks(id) null
 research_run_id uuid references research_runs(id) null
 thread_id text not null
 checkpoint_namespace text
@@ -306,6 +307,8 @@ metadata jsonb
 created_at timestamptz
 updated_at timestamptz
 unique(thread_id)
+unique(conversation_id) where agent_task_id is null and research_run_id is null
+unique(research_run_id) where research_run_id is not null
 ```
 
 Thread strategy:
@@ -382,6 +385,7 @@ project_id uuid references projects(id)
 conversation_id uuid references conversations(id)
 research_run_id uuid references research_runs(id)
 deepagents_thread_id uuid references deepagents_threads(id)
+checkpoint_id text
 type text -- topic_approval, tool_approval, memory_write, filesystem_write, export_approval
 status text -- pending, approved, edited, rejected, expired, resolved
 request_payload jsonb
@@ -389,6 +393,7 @@ response_payload jsonb null
 requested_at timestamptz
 responded_at timestamptz null
 expires_at timestamptz null
+unique(deepagents_thread_id, checkpoint_id)
 ```
 
 ## Asset And File Tables
