@@ -1,8 +1,30 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from harness_core import FakeHarnessAdapter, HarnessAdapter
+from knowledge_core import MosaicSettings, ProviderRegistry, get_settings
 
-app = FastAPI(title="Mosaic API")
-app.state.harness_adapter = FakeHarnessAdapter()
+
+def create_app(
+    settings: MosaicSettings | None = None,
+    provider_registry: ProviderRegistry | None = None,
+    harness_adapter: HarnessAdapter | None = None,
+) -> FastAPI:
+    settings = settings or get_settings()
+    app = FastAPI(title="Mosaic API")
+    app.state.settings = settings
+    app.state.provider_registry = provider_registry or ProviderRegistry(settings)
+    app.state.harness_adapter = harness_adapter or FakeHarnessAdapter()
+    return app
+
+
+app = create_app()
+
+
+def get_application_settings(request: Request) -> MosaicSettings:
+    return request.app.state.settings
+
+
+def get_provider_registry(request: Request) -> ProviderRegistry:
+    return request.app.state.provider_registry
 
 
 def get_harness_adapter() -> HarnessAdapter:
