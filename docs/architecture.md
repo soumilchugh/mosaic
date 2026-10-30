@@ -173,6 +173,11 @@ The context pack should be reproducible from persisted state. DeepAgents can mai
 own checkpoint state, but the product must persist the user-visible projection: messages,
 events, interventions, assets, knowledge updates, and memory updates.
 
+Conversation turns are persisted before execution. The default chat thread is
+`conversation:{conversation_id}`; deep-research runs use `research:{research_run_id}`.
+Intervention records retain the checkpoint ID, so any worker can reconstruct a resume
+request after a restart using database state alone.
+
 Context assembly should treat source knowledge and interaction memory separately:
 
 - source knowledge answers "what do the documents, connectors, code, and web sources

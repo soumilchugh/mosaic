@@ -31,6 +31,7 @@ class HarnessResumeRequest(BaseModel):
     thread_id: str
     decisions: list[dict[str, Any]]
     checkpoint_namespace: str | None = None
+    checkpoint_id: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -119,6 +120,7 @@ class DeepAgentsAdapter:
                 {"decisions": request.decisions},
                 request.thread_id,
                 request.checkpoint_namespace,
+                request.checkpoint_id,
             )
         except Exception as exc:
             yield _product_event(request.task, 1, "run.failed", {"error": str(exc)})
@@ -164,12 +166,13 @@ class DeepAgentsAdapter:
         resume_payload: dict[str, Any],
         thread_id: str,
         checkpoint_namespace: str | None,
+        checkpoint_id: str | None,
     ) -> Any:
         from langgraph.types import Command
 
         return self._agent().invoke(
             Command(resume=resume_payload),
-            config=_deepagents_config(thread_id, checkpoint_namespace),
+            config=_deepagents_config(thread_id, checkpoint_namespace, checkpoint_id),
             version="v2",
         )
 
@@ -190,10 +193,16 @@ def _product_event(
     )
 
 
-def _deepagents_config(thread_id: str, checkpoint_namespace: str | None) -> dict[str, Any]:
+def _deepagents_config(
+    thread_id: str,
+    checkpoint_namespace: str | None,
+    checkpoint_id: str | None = None,
+) -> dict[str, Any]:
     configurable: dict[str, Any] = {"thread_id": thread_id}
     if checkpoint_namespace is not None:
         configurable["checkpoint_ns"] = checkpoint_namespace
+    if checkpoint_id is not None:
+        configurable["checkpoint_id"] = checkpoint_id
     return {"configurable": configurable}
 
 

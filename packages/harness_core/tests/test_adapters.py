@@ -32,6 +32,7 @@ async def test_fake_adapter_starts_and_resumes_without_model_calls() -> None:
         task=task,
         thread_id="thread-1",
         decisions=[{"type": "approve"}],
+        checkpoint_id="checkpoint-7",
     )
 
     started_events = [event async for event in adapter.start(start_request)]
@@ -81,3 +82,37 @@ async def test_deepagents_adapter_uses_injected_agent_factory() -> None:
         {"configurable": {"thread_id": "thread-1", "checkpoint_ns": "chat"}},
         "v2",
     )
+
+
+async def test_deepagents_resume_targets_persisted_checkpoint() -> None:
+    task = make_task()
+    calls = []
+
+    class StubAgent:
+        def invoke(self, payload, *, config, version):
+            calls.append((payload, config, version))
+            return {"ok": True}
+
+    adapter = DeepAgentsAdapter(
+        model="test:model",
+        system_prompt="Be useful.",
+        create_agent=lambda **kwargs: StubAgent(),
+    )
+    request = HarnessResumeRequest(
+        task=task,
+        thread_id="research:run-1",
+        checkpoint_namespace="deep_research",
+        checkpoint_id="checkpoint-7",
+        decisions=[{"type": "approve"}],
+    )
+
+    events = [event async for event in adapter.resume(request)]
+
+    assert [event.type for event in events] == ["run.resumed", "run.completed"]
+    assert calls[0][1] == {
+        "configurable": {
+            "thread_id": "research:run-1",
+            "checkpoint_ns": "deep_research",
+            "checkpoint_id": "checkpoint-7",
+        }
+    }

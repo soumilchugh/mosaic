@@ -71,6 +71,60 @@ class AgentTaskStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+class ResearchRunStatus(StrEnum):
+    CREATED = "created"
+    PLANNING = "planning"
+    AWAITING_INTERVENTION = "awaiting_intervention"
+    RESEARCHING = "researching"
+    WRITING = "writing"
+    EDITING = "editing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class ResearchDepth(StrEnum):
+    QUICK = "quick"
+    STANDARD = "standard"
+    DEEP = "deep"
+
+
+class ResearchStrategy(StrEnum):
+    BREADTH_FIRST = "breadth_first"
+    DEPTH_FIRST = "depth_first"
+    HYBRID = "hybrid"
+
+
+class ResearchOutputFormat(StrEnum):
+    MARKDOWN = "markdown"
+    REPORT = "report"
+    DECK_LATER = "deck_later"
+
+
+class DeepAgentsThreadStatus(StrEnum):
+    ACTIVE = "active"
+    PAUSED = "paused"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class InterventionType(StrEnum):
+    TOPIC_APPROVAL = "topic_approval"
+    TOOL_APPROVAL = "tool_approval"
+    MEMORY_WRITE = "memory_write"
+    FILESYSTEM_WRITE = "filesystem_write"
+    EXPORT_APPROVAL = "export_approval"
+
+
+class InterventionStatus(StrEnum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    EDITED = "edited"
+    REJECTED = "rejected"
+    EXPIRED = "expired"
+    RESOLVED = "resolved"
+
+
 class AssetKind(StrEnum):
     UPLOAD = "upload"
     FETCHED_SOURCE = "fetched_source"
@@ -179,6 +233,7 @@ class Message(ContractModel):
     sequence: int = Field(ge=0)
     content_format: MessageContentFormat = MessageContentFormat.MARKDOWN
     user_id: UUID | None = None
+    research_run_id: UUID | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=utc_now)
 
@@ -197,6 +252,67 @@ class AgentTask(ContractModel):
     completed_at: datetime | None = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+
+
+class ResearchRun(ContractModel):
+    id: UUID = Field(default_factory=uuid4)
+    project_id: UUID
+    conversation_id: UUID
+    agent_task_id: UUID
+    created_by_user_id: UUID | None = None
+    intent: str = Field(min_length=1)
+    status: ResearchRunStatus = ResearchRunStatus.CREATED
+    depth: ResearchDepth = ResearchDepth.STANDARD
+    strategy: ResearchStrategy = ResearchStrategy.HYBRID
+    output_format: ResearchOutputFormat = ResearchOutputFormat.REPORT
+    settings: dict[str, Any] = Field(default_factory=dict)
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class DeepAgentsThread(ContractModel):
+    id: UUID = Field(default_factory=uuid4)
+    project_id: UUID
+    thread_id: str = Field(min_length=1, max_length=300)
+    conversation_id: UUID | None = None
+    agent_task_id: UUID | None = None
+    research_run_id: UUID | None = None
+    checkpoint_namespace: str | None = Field(default=None, max_length=300)
+    status: DeepAgentsThreadStatus = DeepAgentsThreadStatus.ACTIVE
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+    @model_validator(mode="after")
+    def validate_owner(self) -> Self:
+        if not any((self.conversation_id, self.agent_task_id, self.research_run_id)):
+            raise ValueError("a DeepAgents thread requires a product owner")
+        return self
+
+
+class InterventionRequest(ContractModel):
+    id: UUID = Field(default_factory=uuid4)
+    project_id: UUID
+    deepagents_thread_id: UUID
+    checkpoint_id: str = Field(min_length=1, max_length=500)
+    type: InterventionType
+    conversation_id: UUID | None = None
+    agent_task_id: UUID | None = None
+    research_run_id: UUID | None = None
+    status: InterventionStatus = InterventionStatus.PENDING
+    request_payload: dict[str, Any] = Field(default_factory=dict)
+    response_payload: dict[str, Any] | None = None
+    requested_at: datetime = Field(default_factory=utc_now)
+    responded_at: datetime | None = None
+    expires_at: datetime | None = None
+
+    @model_validator(mode="after")
+    def validate_owner(self) -> Self:
+        if self.agent_task_id is None and self.research_run_id is None:
+            raise ValueError("an intervention requires an agent task or research run")
+        return self
 
 
 class ProductEvent(ContractModel):
