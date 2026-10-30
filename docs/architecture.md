@@ -31,6 +31,19 @@ FastAPI API and long-running Python workers remain ordinary containers. See
 [deployment-strategy.md](deployment-strategy.md). Neo4j and Redis are optional later
 services, introduced only for measured graph, cache, coordination, or pub/sub needs.
 
+## Configuration And Providers
+
+The API and worker load the same typed `MosaicSettings` environment contract. Provider
+selection is explicit for the database, model, search, storage, queue, and sandbox. A
+small shared registry lazily constructs the configured implementation, allowing local,
+Supabase, and future AWS adapters to implement the same service boundary.
+
+All Mosaic settings use the `MOSAIC_` prefix. Credentials and database URLs are secret
+types and must not be included in logs; startup diagnostics use the allowlisted
+`safe_summary()` fields. Local defaults use fake/no-op model and search providers,
+filesystem storage, an in-memory queue, and a local sandbox so development does not
+require cloud credentials.
+
 ## Persistence Model
 
 Postgres is the product system of record. Object storage stores file bytes. DeepAgents
