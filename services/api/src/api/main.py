@@ -1,6 +1,13 @@
 from fastapi import FastAPI, Request
 from harness_core import FakeHarnessAdapter, HarnessAdapter
-from knowledge_core import MosaicSettings, ProviderRegistry, get_settings
+from knowledge_core import (
+    MosaicSettings,
+    ProviderKind,
+    ProviderRegistry,
+    TaskQueue,
+    get_settings,
+    register_task_queue_providers,
+)
 
 
 def create_app(
@@ -12,6 +19,7 @@ def create_app(
     app = FastAPI(title="Mosaic API")
     app.state.settings = settings
     app.state.provider_registry = provider_registry or ProviderRegistry(settings)
+    register_task_queue_providers(app.state.provider_registry)
     app.state.harness_adapter = harness_adapter or FakeHarnessAdapter()
     return app
 
@@ -25,6 +33,10 @@ def get_application_settings(request: Request) -> MosaicSettings:
 
 def get_provider_registry(request: Request) -> ProviderRegistry:
     return request.app.state.provider_registry
+
+
+def get_task_queue(request: Request) -> TaskQueue:
+    return get_provider_registry(request).resolve(ProviderKind.QUEUE)
 
 
 def get_harness_adapter() -> HarnessAdapter:

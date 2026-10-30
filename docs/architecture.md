@@ -133,6 +133,22 @@ The SQLAlchemy repository set participates in the caller's database session; the
 worker transaction owns commit and rollback. The matching in-memory repository set is
 used for deterministic unit tests and applies the same access and cross-project rules.
 
+## Task Queue Contract
+
+Postgres owns durable `agent_tasks` status and results. Queue messages contain only the
+task, project, type, trace, and idempotency identifiers needed to route work; workers
+load authoritative task context through repositories after receiving a delivery.
+
+The shared asynchronous queue contract supports enqueue, leased receive, completion,
+delayed retry, cancellation, and state inspection. A delivery receipt is valid only
+until its visibility lease expires. Abandoned deliveries become available again, and
+work that exhausts its configured attempts moves to a dead-letter state.
+
+The in-memory adapter provides deterministic tests and single-process development. It is
+not a transport between separately deployed API and worker containers. The production
+Postgres/Supabase Queue and future SQS adapters must preserve the same idempotency and
+lease semantics.
+
 ## Context Assembly
 
 Every new user turn should build a bounded context pack before starting or resuming

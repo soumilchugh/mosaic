@@ -4,10 +4,11 @@ from api.main import (
     get_application_settings,
     get_harness_adapter,
     get_provider_registry,
+    get_task_queue,
 )
 from fastapi.testclient import TestClient
 from harness_core import FakeHarnessAdapter
-from knowledge_core import MosaicSettings, ProviderRegistry
+from knowledge_core import InMemoryTaskQueue, MosaicSettings, ProviderRegistry
 from starlette.requests import Request
 
 
@@ -25,6 +26,7 @@ def test_api_exposes_harness_adapter_boundary() -> None:
 def test_api_exposes_shared_settings_and_provider_registry() -> None:
     request = Request({"type": "http", "app": app})
     assert get_provider_registry(request).settings is get_application_settings(request)
+    assert isinstance(get_task_queue(request), InMemoryTaskQueue)
 
 
 def test_api_factory_accepts_injected_runtime_dependencies() -> None:

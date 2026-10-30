@@ -43,6 +43,17 @@ from knowledge_core.contracts import (
     Project,
     ProjectStatus,
 )
+from knowledge_core.task_queue import (
+    DeliveryLeaseExpiredError,
+    EnqueueResult,
+    InMemoryTaskQueue,
+    QueueDelivery,
+    QueueItemState,
+    TaskQueue,
+    TaskQueueMessage,
+    UnknownDeliveryError,
+    register_task_queue_providers,
+)
 
 __all__ = [
     "AgentTask",
@@ -53,6 +64,8 @@ __all__ = [
     "Conversation",
     "ConversationStatus",
     "DatabaseProvider",
+    "DeliveryLeaseExpiredError",
+    "EnqueueResult",
     "Environment",
     "GraphChunk",
     "GraphEdge",
@@ -61,6 +74,7 @@ __all__ = [
     "GraphSchemaVersion",
     "IngestionRun",
     "IngestionRunStatus",
+    "InMemoryTaskQueue",
     "KnowledgeFile",
     "KnowledgeFileStatus",
     "KnowledgeFileType",
@@ -77,11 +91,17 @@ __all__ = [
     "ProviderKind",
     "ProviderNotRegisteredError",
     "ProviderRegistry",
+    "QueueDelivery",
+    "QueueItemState",
     "Project",
     "ProjectStatus",
     "QueueProvider",
     "SandboxProvider",
     "SearchProvider",
     "StorageProvider",
+    "TaskQueue",
+    "TaskQueueMessage",
+    "UnknownDeliveryError",
     "get_settings",
+    "register_task_queue_providers",
 ]
